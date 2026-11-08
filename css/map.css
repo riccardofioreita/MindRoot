@@ -957,3 +957,24 @@ html[data-ai-labels][data-ai-writing] .mv-node::after { display: none; }
 
 /* Attach to: the next node chosen becomes the parent. */
 html[data-linking] .mv-node { cursor: crosshair; }
+
+/* The laser pointer over the map (js/features/laser.js): a layer over the
+   stage that takes the pointer while it is on, and a glowing red trail. */
+.map-laser {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-map-overlay);
+  cursor: crosshair;
+  touch-action: none;
+}
+.map-laser__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.map-laser__svg[data-off] { display: none; }
+.map-laser__glow, .map-laser__core { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.map-laser__glow { stroke: rgb(255 59 48 / 0.35); stroke-width: 12; filter: blur(3px); }
+.map-laser__core { stroke: #ff3b30; stroke-width: 3.5; }
+.map-laser__dot { fill: #ff3b30; filter: drop-shadow(0 0 6px rgb(255 59 48 / 0.9)); }
+@media (forced-colors: active) {
+  .map-laser__glow, .map-laser__core { stroke: Highlight; }
+  .map-laser__dot { fill: Highlight; }
+}
+@media print { .map-laser { display: none !important; } }

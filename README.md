@@ -61,7 +61,8 @@ Every map has a **board** (Map | Board, Ctrl+Shift+L), and any node can have its
 - **Infinite canvases** (the default) or **fixed-size pages** (A3 to A6, B5, Letter, Legal, square, 16:9, 4:3, iPad or any size in mm).
 - **30 papers**: dots, squares, lines, school rulings, Cornell notes, millimetre, log and polar paper, music staves, wireframes, planners, calligraphy guides, or a picture of your own.
 - **Tools**: pen, pencil, marker, brush and highlighter with pressure, shapes, arrows, text, pictures, select and an eraser for part of a stroke, a whole stroke or an area. The ink follows the theme.
-- **Laser pointer** (pen only): the dot-and-rays button beside the pen, or Ink | Laser in the pen's options. The pen then leaves a red trail that fades within a second - for presenting or pointing during a call - and draws nothing: no stroke, no save, no undo step. Any other tool turns it off.
+- **Laser pointer on the map** too: the dot-and-rays button in the zoom capsule (or Ctrl+Alt+L) points at the map with the same fading red trail - a mouse just moves, a finger drags - without moving or changing anything. Escape or the button again turns it off.
+- **Laser pointer** in notebooks (pen only): the dot-and-rays button beside the pen, or Ink | Laser in the pen's options. The pen then leaves a red trail that fades within a second - for presenting or pointing during a call - and draws nothing: no stroke, no save, no undo step. Any other tool turns it off.
 - **Pages and canvases** with thumbnails to add, duplicate, reorder and restore; **export** as a PDF of every page or a PNG of one.
 
 A notebook is a folder of the project (`assets/<name>.book/`) with a `book.json` and one SVG per page: every page reads outside MindRoot too, and carries its editable drawing inside.
@@ -93,7 +94,7 @@ Bottom sheets and a thumb bar instead of a squeezed desktop:
 
 - a tap selects a node, a double tap renames it, a long press opens its menu (keep moving the finger to drag the node);
 - one finger pans, two fingers zoom; a swipe from the left edge brings out the projects;
-- the bottom bar holds child, sibling, rename and undo, and "More" for the rest;
+- the bottom bar holds child, sibling, rename and undo, and "More" for the rest; a small capsule at the top right opens the Markdown, the AI chat and the laser in one tap;
 - in a notebook a finger draws until a stylus has been used, and pans from then on.
 
 ## Your data
@@ -124,6 +125,7 @@ On a Mac, Ctrl means ⌘. The complete list is in the help (F1 or `?`), generate
 | Ctrl+M | The Markdown panel |
 | Ctrl+Shift+L | Map or board |
 | Ctrl+Shift+A / Ctrl+Shift+H | The AI assistant window / the AI chat |
+| Ctrl+Alt+L | The laser pointer on the map |
 | Ctrl+. | Suggest branches (AI) |
 | Ctrl+Shift+E / Ctrl+O | Export / import |
 | Ctrl+S / Ctrl+, | Save now / settings |

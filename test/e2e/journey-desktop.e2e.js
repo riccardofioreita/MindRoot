@@ -50,7 +50,7 @@ module.exports = async function (t) {
   t.check('the projects list is a column, open', first.sidebar !== 'closed', first);
   var bars = await J.barIds();
   t.same(bars.top, ['history.undo', 'history.redo', 'source.toggle', 'ai.open', 'ai.chat', 'search.nodes'], 'the top capsule holds undo, redo, Markdown, the AI assistant, the chat and search');
-  t.same(bars.zoom, ['view.zoomOut', 'view.fit', 'view.zoomIn', 'map.tidy'], 'the zoom capsule: zoom, fit and tidy up');
+  t.same(bars.zoom, ['view.zoomOut', 'view.fit', 'view.zoomIn', 'view.laser', 'map.tidy'], 'the zoom capsule: zoom, fit, the laser and tidy up');
   t.eq(await page.isVisible('#zoombar'), true, 'and it is shown');
   await t.shot('welcome-light', page);
 

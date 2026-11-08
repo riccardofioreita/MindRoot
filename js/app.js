@@ -104,7 +104,7 @@ window.MindRoot = window.MindRoot || {};
    * tab guard goes first: it decides whether this tab may write before
    * anything opens a map. */
   var MODULES = ['tabs', 'sidebar', 'session', 'editor', 'notes', 'colorpicker', 'source', 'exporter', 'media', 'ink',
-    'notebook', 'aiui', 'aichat', 'mentions', 'trash', 'copies', 'palette', 'settings', 'help', 'welcome', 'pwa'];
+    'notebook', 'aiui', 'aichat', 'mentions', 'laser', 'trash', 'copies', 'palette', 'settings', 'help', 'welcome', 'pwa'];
 
   /* The ids the modules register (session: history.*, editor: node.*,
    * workspace: search.nodes and palette.open). */
@@ -134,10 +134,18 @@ window.MindRoot = window.MindRoot || {};
       { slot: 'edit', ids: ['node.rename'] },
       { slot: 'undo', ids: UNDO }
     ],
+    /* A phone's top right: what the thumb bar has no room for and is
+     * wanted often - the Markdown, the chat with the AI, the laser. */
+    quick: [
+      { slot: 'source', ids: ['source.toggle'] },
+      { slot: 'chat', ids: ['ai.chat'] },
+      { slot: 'laser', ids: ['view.laser'] }
+    ],
     zoom: [
       { slot: 'zoomOut', ids: ['view.zoomOut'] },
       { slot: 'fit', ids: ['view.fit'] },
       { slot: 'zoomIn', ids: ['view.zoomIn'] },
+      { slot: 'laser', ids: ['view.laser'] },
       { slot: 'tidy', ids: ['map.tidy'] }
     ]
   };
@@ -158,6 +166,7 @@ window.MindRoot = window.MindRoot || {};
       'app.region.sidebar': 'Projects and maps',
       'app.region.stage': 'Map',
       'app.region.source': 'Markdown',
+      'app.region.quick': 'Markdown and AI',
       'app.region.actions': 'Actions',
       'app.region.zoom': 'Zoom',
       'app.cmd.sidebar': 'Show or hide the projects',
@@ -219,6 +228,7 @@ window.MindRoot = window.MindRoot || {};
       'app.region.sidebar': 'Progetti e mappe',
       'app.region.stage': 'Mappa',
       'app.region.source': 'Markdown',
+      'app.region.quick': 'Markdown e AI',
       'app.region.actions': 'Azioni',
       'app.region.zoom': 'Zoom',
       'app.cmd.sidebar': 'Mostra o nascondi i progetti',
@@ -284,7 +294,7 @@ window.MindRoot = window.MindRoot || {};
   var els = {};
   var shell = {
     layout: null,
-    bars: { top: [], thumb: [], zoom: [] },
+    bars: { top: [], thumb: [], zoom: [], quick: [] },
     viewEsc: null,
     drawerEsc: null,
     themeMetas: []
@@ -684,18 +694,20 @@ window.MindRoot = window.MindRoot || {};
    * module registered one later), and focus survives the rebuild. */
   function renderBars() {
     if (!els.actions) return;
-    var plan = { top: resolvedIds(BARS.top), thumb: resolvedIds(BARS.thumb), zoom: resolvedIds(BARS.zoom) };
-    if (shell.plan && shell.plan.top === plan.top && shell.plan.thumb === plan.thumb && shell.plan.zoom === plan.zoom) {
+    var plan = { top: resolvedIds(BARS.top), thumb: resolvedIds(BARS.thumb), zoom: resolvedIds(BARS.zoom), quick: resolvedIds(BARS.quick) };
+    if (shell.plan && shell.plan.top === plan.top && shell.plan.thumb === plan.thumb && shell.plan.zoom === plan.zoom && shell.plan.quick === plan.quick) {
       updateBars();
       return;
     }
     shell.plan = plan;
     var active = document.activeElement;
-    var bar = active && active.closest ? active.closest('#topbar-actions, #thumbbar, #zoombar') : null;
+    var bar = active && active.closest ? active.closest('#topbar-actions, #thumbbar, #zoombar, #topbar-quick') : null;
     var key = bar ? (active.getAttribute('data-command') || (active.classList.contains('btn--more') ? 'more' : null)) : null;
     shell.bars.top = fillBar(els.actions, BARS.top, true, topControls);
     shell.bars.thumb = fillBar(els.thumbbar, BARS.thumb, true);
     shell.bars.zoom = fillBar(els.zoombar, BARS.zoom, false);
+    shell.bars.quick = fillBar(els.quick, BARS.quick, false);
+    if (shell.rovingQuick) shell.rovingQuick.refresh();
     if (shell.rovingTop) shell.rovingTop.refresh();
     if (shell.rovingZoom) shell.rovingZoom.refresh();
     if (shell.rovingThumb) shell.rovingThumb.refresh();
@@ -710,8 +722,8 @@ window.MindRoot = window.MindRoot || {};
    * title(), on every event that can change them (one pass per frame). */
   function updateBars() {
     var ctx = { source: 'button' };
-    ['top', 'thumb', 'zoom'].forEach(function (name) {
-      shell.bars[name].forEach(function (b) {
+    ['top', 'thumb', 'zoom', 'quick'].forEach(function (name) {
+      (shell.bars[name] || []).forEach(function (b) {
         swapButton(b, slotCommand(b));
         if (!commands.has(b.id)) return;
         var on = commands.enabled(b.id, ctx);
@@ -1100,6 +1112,7 @@ window.MindRoot = window.MindRoot || {};
     els.lead = byId('topbar-lead');
     els.actions = byId('topbar-actions');
     els.thumbbar = byId('thumbbar');
+    els.quick = byId('topbar-quick');
     els.layers = byId('layers') || document.body;
     els.drop = byId('drop');
     els.banners = byId('banners');
@@ -1146,6 +1159,7 @@ window.MindRoot = window.MindRoot || {};
     shell.rovingZoom = ui.roving(els.zoombar);
     /* The phone's thumb bar is a toolbar too: one Tab stop, arrows inside. */
     shell.rovingThumb = els.thumbbar ? ui.roving(els.thumbbar) : null;
+    shell.rovingQuick = els.quick ? ui.roving(els.quick) : null;
 
     applyLayout();
     ['(max-width: 639px)', '(min-width: 1024px)'].forEach(function (q) {

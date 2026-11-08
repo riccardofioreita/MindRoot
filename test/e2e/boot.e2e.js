@@ -11,7 +11,7 @@ var H = require('../fixtures/shell/helpers.js');
 var SCRIPT_ORDER = ['core/util', 'core/i18n', 'core/bus', 'core/prefs', 'core/ui', 'core/float', 'core/commands',
   'model/color', 'model/doc', 'model/store', 'model/zip', 'model/storage', 'model/archive', 'map/layout',
   'map/gestures', 'map/mapview', 'map/session', 'map/notes', 'map/editor', 'features/colorpicker',
-  'features/source', 'features/export', 'features/paper', 'features/ink', 'features/notebook', 'features/ai', 'features/ai-ui', 'features/ai-chat', 'features/mentions', 'features/media', 'features/sidebar', 'features/trash',
+  'features/source', 'features/export', 'features/paper', 'features/ink', 'features/notebook', 'features/ai', 'features/ai-ui', 'features/ai-chat', 'features/mentions', 'features/laser', 'features/media', 'features/sidebar', 'features/trash',
   'features/copies', 'features/palette', 'features/settings', 'features/help', 'features/welcome',
   'features/tabs', 'features/pwa', 'app'];
 

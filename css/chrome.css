@@ -189,6 +189,9 @@
 }
 .topbar__slot--lead { flex: 0 1 auto; }
 .topbar__slot--actions { flex: none; margin-left: auto; }
+/* The phone's quick capsule (Markdown, AI chat, laser): only under 640px,
+   where the actions capsule moves down to the thumb. */
+.topbar__slot--quick { display: none; }
 .topbar__slot > * { min-width: 0; }
 
 .capsule {
@@ -340,6 +343,7 @@
   /* Only the lead capsule (menu, title, save dot) on top; the actions moved
      down to the thumb. */
   .topbar__slot--actions { display: none; }
+  .topbar__slot--quick { display: flex; flex: none; margin-left: auto; }
   .topbar__slot--lead { flex: 0 1 auto; max-width: 100%; }
   .topbar__slot--lead > .capsule { flex: 0 1 auto; max-width: 100%; }
   .title[data-has-map] .title__project,
