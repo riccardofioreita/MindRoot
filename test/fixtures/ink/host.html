@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ink host</title>
+<!-- The drawing editor on its own: tokens, its stylesheet, a stub for the
+     strings and ink.js - nothing else of the app. The e2e suite mounts the
+     editor with window.mount() and drives it with real input. -->
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="../../../css/ink.css">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); }
+  #host { position: fixed; inset: 0; }
+</style>
+</head>
+<body>
+<div id="host"></div>
+<script src="i18n-stub.js"></script>
+<script src="../../../js/features/ink.js"></script>
+<script src="samples.js"></script>
+<script>
+  window.saves = [];
+  window.closes = [];
+  /* Keys that got past the editor to the page: the app's shortcuts listen
+     on document, so anything here would have reached the map. Mod+S is
+     taken here as the app's global binding takes it, so the browser never
+     offers to save the page. */
+  window.leaked = [];
+  document.addEventListener('keydown', function (e) {
+    window.leaked.push(e.key);
+    if ((e.ctrlKey || e.metaKey) && !e.defaultPrevented && (e.key || '').toLowerCase() === 's') e.preventDefault();
+  });
+  window.editor = null;
+  window.mount = function (opts) {
+    if (window.editor) window.editor.close();
+    window.saves = [];
+    window.closes = [];
+    var base = {
+      title: 'Test',
+      onSave: function (svg) { window.saves.push(svg); },
+      onClose: function (info) { window.closes.push(info); }
+    };
+    for (var k in opts || {}) base[k] = opts[k];
+    window.editor = window.MindRoot.ink.open(document.getElementById('host'), base);
+    return true;
+  };
+</script>
+</body>
+</html>

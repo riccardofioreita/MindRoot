@@ -1,0 +1,858 @@
+/* MindRoot - ink: the drawing editor (js/features/ink.js).
+ *
+ * A self-contained component: it is mounted in the app's viewer and on bare
+ * pages (tests, an embedding) that load only tokens.css and this file, so it
+ * resets its own controls and every token it reads carries a fallback.
+ *
+ * The sheet is the light paper the drawing is saved on, unless the host
+ * gives the editor a look (a notebook: the paper of ns.paper, light or dark
+ * with the theme, or a chosen colour): ink.js then writes the sheet and the
+ * ink it shows into --ink-sheet and --ink-on-sheet, marks a dark sheet
+ * (data-sheet="dark"), a paper (data-paper, which replaces the dot grid)
+ * and a bounded page (data-page: the sheet is see-through around the page,
+ * the host's desk shows there). The chrome around it - the bars,
+ * the popover - follows the theme as glass over the sheet, with the same
+ * fallbacks as the app's .glass (no backdrop-filter, reduced transparency,
+ * more contrast, forced colours).
+ *
+ * Layout is chosen by ink.js (data-layout) from what fits in the editor's
+ * own width: 'wide' floats the tools as a capsule at the top, the actions
+ * at the top right and the zoom at the bottom left, when the two top bars
+ * fit side by side; 'compact' (a phone, an upright tablet, a narrow viewer
+ * pane) puts the main tools at the bottom under the thumb and the rest in a
+ * popover. Durations and curves are the motion tokens. */
+
+.ink {
+  /* Component tokens. The sheet colour is written from ink.js (PAPER), the
+     one place it is defined, since it is also written into every file. The
+     selection colour is the light-theme accent in both themes: it is drawn
+     on the light sheet, where the dark-theme green is under 3:1. */
+  --ink-sheet: #fbfaf7;
+  --ink-grid: rgb(31 35 40 / 0.13);
+  --ink-sel: #2f7d5a;
+  --ink-sel-soft: rgb(47 125 90 / 0.10);
+  --ink-on-sheet: #15171c;
+  --ink-on-sheet-hover: rgb(21 23 28 / 0.07);
+  --ink-on-sheet-faint: rgb(21 23 28 / 0.4);
+  --ink-handle: #ffffff;
+  /* The eraser's circle: a dark ring inside a light one, readable over any
+     ink and over the paper. */
+  --ink-ring-light: rgb(255 255 255 / 0.9);
+  --ink-ring-dark: rgb(21 23 28 / 0.85);
+  --ink-swatch-rim: rgb(20 22 28 / 0.18);
+  /* "Any other colour": the wheel of the eight inks. */
+  --ink-rainbow: conic-gradient(#c4314b, #d9731c, #f2c12e, #2f7d5a, #2f6fb3, #8a5fbf, #c4314b);
+  --ink-gap: var(--chrome-gap, 0.75rem);
+  --ink-btn: var(--control-h, 32px);
+  --ink-pad: var(--capsule-pad, 4px);
+  --ink-hairline: 0.5px;
+  --ink-swatch-w: 12px;
+  --ink-swatch-h: 3px;
+  --ink-nib-box: 48px;
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 12rem;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ink-sheet);
+  color: var(--ink, #15171c);
+  font-family: var(--font-ui, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  font-size: var(--fs-ui, 0.8125rem);
+  line-height: var(--lh-snug, 1.35);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  outline: none;
+}
+.ink *,
+.ink *::before,
+.ink *::after { box-sizing: border-box; }
+.ink [hidden] { display: none !important; }
+.ink:focus-visible { box-shadow: inset 0 0 0 2px var(--focus, var(--accent, #2f7d5a)); }
+
+.ink__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- the sheet */
+
+.ink__surface {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-map, 0);
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  background-color: var(--ink-sheet);
+  background-image: radial-gradient(circle, var(--ink-grid) 0 1px, transparent 1.4px);
+  touch-action: none;
+  cursor: crosshair;
+}
+.ink[data-tool="select"] .ink__surface { cursor: var(--mr-cursor, default); }
+/* Over the selection (ink.js sets data-hover): a press there moves it, or
+   on a handle resizes it. */
+.ink[data-tool="select"]:where([data-hover="move"]) .ink__surface { cursor: move; }
+.ink[data-tool="select"]:where([data-hover="nwse"]) .ink__surface { cursor: nwse-resize; }
+.ink[data-tool="select"]:where([data-hover="nesw"]) .ink__surface { cursor: nesw-resize; }
+.ink[data-tool="select"]:where([data-hover="ns"]) .ink__surface { cursor: ns-resize; }
+.ink[data-tool="select"]:where([data-hover="ew"]) .ink__surface { cursor: ew-resize; }
+.ink[data-tool="text"] .ink__surface { cursor: text; }
+/* The pen is its nib: ink.js draws its outline (.ink__pen-ring) where the mouse
+   or the pen is, and the system cursor steps aside while it is live (the
+   page draws it because a browser may drop a cursor image and show the
+   crosshair instead, above all under a hovering stylus). Before the hand
+   rules below, which win over it (the same weight, later). */
+.ink[data-tool="pen"]:where([data-nib-live]) .ink__surface { cursor: none; }
+.ink[data-tool="hand"] .ink__surface,
+.ink[data-space] .ink__surface,
+.ink[data-readonly] .ink__surface { cursor: grab; }
+.ink[data-gesture="pan"] .ink__surface,
+.ink[data-gesture="pinch"] .ink__surface { cursor: grabbing; }
+/* The eraser draws its own circle (it follows a hovering pen too, where
+   cursors are unreliable); the arrow would only sit in the middle of it. */
+@media (hover: hover) and (pointer: fine) {
+  .ink[data-tool="eraser"]:not([data-eraser="area"]) .ink__surface { cursor: none; }
+}
+
+/* A paper replaces the dot grid; a page leaves the editor see-through
+   around it (the paper layer draws the sheet of the page itself). */
+.ink[data-paper] .ink__surface { background-image: none; }
+.ink[data-page],
+.ink[data-page] .ink__surface {
+  background: transparent;
+}
+.ink__paper,
+.ink__paper-image { pointer-events: none; }
+
+/* A dark sheet: the dot grid, the hover tints over the colours and the
+   swatch rims are drawn in light ink. */
+.ink[data-sheet="dark"] {
+  --ink-grid: rgb(228 230 234 / 0.16);
+  --ink-on-sheet-hover: rgb(228 230 234 / 0.10);
+  --ink-on-sheet-faint: rgb(228 230 234 / 0.45);
+  --ink-swatch-rim: rgb(228 230 234 / 0.28);
+  --ink-sel: #3f9a71;
+  --ink-sel-soft: rgb(63 154 113 / 0.16);
+}
+
+.ink__bg { pointer-events: none; }
+
+.ink__cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: var(--z-map-overlay, 10);
+  border-radius: 50%;
+  /* A dark ring inside a light one: readable over any ink. */
+  box-shadow: 0 0 0 1px var(--ink-ring-light), inset 0 0 0 1px var(--ink-ring-dark);
+  pointer-events: none;
+}
+
+/* The pen's pointer: the outline of the mark it will leave, hollow so the
+   aimed point stays in view; the pen's colour only tints the inside. The
+   outline is the sheet's own ink, softened, with a hair of the sheet's
+   colour outside it (all three from ink.js: --nib-ring, --nib-halo,
+   --nib-color). */
+.ink__pen-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: var(--z-map-overlay, 10);
+  box-sizing: border-box;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nib-halo, transparent) 60%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--nib-ring, currentColor) 70%, transparent);
+  pointer-events: none;
+}
+.ink__pen-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--nib-color, transparent);
+  opacity: 0.16;
+}
+
+.ink__overlay { pointer-events: none; }
+.ink__frame {
+  fill: none;
+  stroke: var(--ink-sel);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.ink__handle {
+  fill: var(--ink-handle);
+  stroke: var(--ink-sel);
+  stroke-width: 1.5;
+}
+/* The padlock of a locked picture (select tool): a small disc on its corner
+   that gives it back. */
+.ink__lock { cursor: pointer; pointer-events: none; }
+.ink__lock-disc {
+  fill: var(--ink-sheet);
+  stroke: var(--ink-sel);
+  stroke-width: 1.5;
+}
+.ink__lock-icon {
+  fill: none;
+  stroke: var(--ink-sel);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ink__marquee {
+  fill: var(--ink-sel-soft);
+  stroke: var(--ink-sel);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.ink__lasso {
+  fill: none;
+  stroke: var(--ink-sel);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ink__lasso--close {
+  stroke-dasharray: 4 4;
+  opacity: 0.7;
+}
+
+/* ---------------------------------------------------------------- text being written */
+
+.ink__text {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: var(--z-map-overlay, 10);
+  min-width: 1em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 1px dashed var(--ink-sel);
+  outline-offset: 2px;
+  background: transparent;
+  overflow: hidden;
+  resize: none;
+  white-space: pre;
+  transform-origin: 0 0;
+  caret-color: var(--ink-on-sheet);
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: auto;
+}
+.ink__text::placeholder { color: var(--ink-on-sheet-faint); }
+
+/* ---------------------------------------------------------------- bars */
+
+.ink__bar {
+  position: absolute;
+  z-index: var(--z-chrome, 20);
+  display: flex;
+  align-items: center;
+  gap: var(--tap-gap, 2px);
+  max-width: calc(100% - 2 * var(--ink-gap));
+  padding: var(--ink-pad);
+  border-radius: var(--r-capsule, 999px);
+  background: var(--glass-regular, rgb(255 255 255 / 0.72));
+  -webkit-backdrop-filter: blur(var(--glass-blur-regular, 16px)) saturate(var(--glass-sat, 170%));
+  backdrop-filter: blur(var(--glass-blur-regular, 16px)) saturate(var(--glass-sat, 170%));
+  box-shadow:
+    inset 0 0 0 var(--ink-hairline) var(--glass-rim, rgb(20 22 28 / 0.10)),
+    inset 0 1px 0 var(--glass-highlight, rgb(255 255 255 / 0.75)),
+    var(--glass-shadow, 0 1px 2px rgb(20 22 28 / 0.06), 0 8px 24px rgb(20 22 28 / 0.10));
+  color: var(--ink, #15171c);
+  font-weight: var(--fw-medium, 500);
+  letter-spacing: var(--tr-glass, 0.005em);
+  touch-action: manipulation;
+}
+
+.ink__tools {
+  top: calc(var(--ink-gap) + var(--safe-top, 0px));
+  left: calc(var(--ink-gap) + var(--safe-left, 0px));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ink__tools::-webkit-scrollbar { display: none; }
+
+.ink__actions {
+  top: calc(var(--ink-gap) + var(--safe-top, 0px));
+  right: calc(var(--ink-gap) + var(--safe-right, 0px));
+}
+
+.ink__zoom {
+  left: calc(var(--ink-gap) + var(--safe-left, 0px));
+  bottom: calc(var(--ink-gap) + var(--safe-bottom, 0px));
+  background: var(--glass-thin, rgb(255 255 255 / 0.6));
+}
+
+.ink__selbar {
+  left: 0;
+  top: 0;
+  z-index: var(--z-map-overlay, 10);
+  max-width: none;
+}
+
+.ink__sep {
+  flex: none;
+  width: 1px;
+  height: calc(var(--ink-btn) * 0.6);
+  margin: 0 var(--sp-1, 0.25rem);
+  background: var(--line-strong, #c6cad2);
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.ink__btn,
+.ink__choice {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2, 0.5rem);
+  min-width: var(--ink-btn);
+  height: var(--ink-btn);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-capsule, 999px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: var(--mr-cursor, pointer);
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
+}
+/* A 32px button on a mouse still gets a 36px target. */
+.ink__btn::after,
+.ink__choice::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+}
+.ink__btn:focus-visible,
+.ink__choice:focus-visible {
+  outline: 2px solid var(--focus, var(--accent, #2f7d5a));
+  outline-offset: 2px;
+  box-shadow: var(--focus-halo, 0 0 0 4px rgb(251 251 252 / 0.7));
+}
+.ink__icon {
+  display: block;
+  flex: none;
+  width: var(--icon, 20px);
+  height: var(--icon, 20px);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ink__btn:hover:not(:disabled):not([aria-pressed="true"]),
+  .ink__choice:hover:not([aria-checked="true"]) { background-color: var(--hover, rgb(20 22 28 / 0.06)); }
+}
+.ink__btn:active:not(:disabled),
+.ink__choice:active { background-color: var(--pressed, rgb(20 22 28 / 0.10)); }
+/* On: a solid accent pill (an accent icon on glass would be 2.7:1). */
+.ink__btn[aria-pressed="true"],
+.ink__choice[aria-checked="true"] {
+  background: var(--accent, #2f7d5a);
+  color: var(--on-accent, #ffffff);
+}
+.ink__btn:disabled {
+  color: var(--ink-disabled, #878d99);
+  cursor: var(--mr-cursor, default);
+}
+.ink__danger { color: var(--danger, #b4485f); }
+
+/* The ink of the pen in hand, and of whatever the style button acts on. */
+.ink__swatch {
+  position: absolute;
+  left: 50%;
+  bottom: var(--ink-swatch-h);
+  width: var(--ink-swatch-w);
+  height: var(--ink-swatch-h);
+  margin-left: calc(var(--ink-swatch-w) / -2);
+  border-radius: var(--r-capsule, 999px);
+  background: var(--swatch, currentColor);
+  box-shadow: 0 0 0 var(--ink-hairline) var(--ink-swatch-rim);
+  pointer-events: none;
+}
+
+/* A button that holds more (a tool's options, the colour and size): a
+   small chevron on its rim, pointing where the options open - down from
+   the top bar, up from the bottom one. Faint at rest; on the tool in hand
+   it sits in a small badge of the paper on the accent pill, so it reads
+   as part of the button and is never lost at the pill's edge. Its corner
+   of the button is a target of its own: a press there opens the options at
+   once (ink.js). The badge is centred on the rim at 45 degrees, clear of
+   the icon. */
+.ink__caret {
+  --caret-box: var(--ink-caret, 12px);
+  /* Where the rim at 45 degrees falls inside this corner box (40% of the
+     button): (0.5 + 0.354) of the button, less the 0.6 before the box. */
+  --caret-at: 63.5%;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 40%;
+  height: 40%;
+}
+.ink__caret-icon {
+  position: absolute;
+  left: calc(var(--caret-at) - var(--caret-box) / 2);
+  top: calc(var(--caret-at) - var(--caret-box) / 2);
+  display: block;
+  width: var(--caret-box);
+  height: var(--caret-box);
+  border-radius: 50%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.ink__btn[aria-pressed="true"] .ink__caret-icon {
+  background: var(--paper-raised, #ffffff);
+  box-shadow: 0 0 0 var(--ink-hairline) var(--line-strong, #c6cad2), 0 1px 2px rgb(20 22 28 / 0.18);
+  color: var(--accent, #2f7d5a);
+  opacity: 1;
+}
+.ink__btn[aria-expanded="true"] .ink__caret-icon { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .ink__btn:hover:not([aria-pressed="true"]) .ink__caret-icon { opacity: 0.85; }
+}
+.ink[data-layout="compact"] .ink__caret {
+  top: 0;
+  bottom: auto;
+}
+.ink[data-layout="compact"] .ink__caret-icon {
+  top: calc(100% - var(--caret-at) - var(--caret-box) / 2);
+  rotate: 180deg;
+}
+
+.ink__done {
+  gap: var(--sp-1, 0.25rem);
+  padding: 0 var(--sp-3, 0.75rem) 0 var(--sp-2, 0.5rem);
+  background: var(--accent, #2f7d5a);
+  color: var(--on-accent, #ffffff);
+  font-weight: var(--fw-semibold, 600);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ink__done:hover:not(:disabled) { background: var(--accent, #2f7d5a); filter: brightness(1.08); }
+}
+
+.ink__zoom-level {
+  min-width: calc(var(--ink-btn) * 1.6);
+  padding: 0 var(--sp-1, 0.25rem);
+  font-size: var(--fs-xs, 0.75rem);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The save state: a dot always, a word where there is room. */
+.ink__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1, 0.25rem);
+  padding: 0 var(--sp-2, 0.5rem);
+  /* On glass, text is --ink: --ink-soft drops to 3.7:1 over the sheet. */
+  color: var(--ink, #15171c);
+  font-size: var(--fs-xs, 0.75rem);
+  white-space: nowrap;
+}
+.ink__status-dot {
+  width: var(--dot, 8px);
+  height: var(--dot, 8px);
+  border-radius: 50%;
+  background: var(--line-strong, #c6cad2);
+}
+.ink[data-save="dirty"] .ink__status-dot,
+.ink[data-save="saving"] .ink__status-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent, #2f7d5a); }
+.ink[data-save="saved"] .ink__status-dot { background: var(--accent, #2f7d5a); }
+.ink[data-save="failed"] .ink__status-dot { background: var(--danger, #b4485f); }
+.ink[data-save="failed"] .ink__status { color: var(--danger, #b4485f); }
+.ink[data-save="clean"] .ink__status-text { display: none; }
+
+/* Done while the host is still answering the last save: it closes when
+   the answer comes. */
+.ink__done[aria-disabled="true"] { cursor: progress; opacity: 0.8; }
+
+/* ---------------------------------------------------------------- the notice */
+
+/* Why a file opened as it did (newer, unreadable, damaged). Under the top
+   bars in both layouts, so it never covers a control; presses go through
+   it to the sheet. */
+.ink__notice {
+  position: absolute;
+  top: calc(var(--ink-gap) * 2 + var(--ink-btn) + 2 * var(--ink-pad) + var(--safe-top, 0px));
+  left: calc(var(--ink-gap) + var(--safe-left, 0px));
+  z-index: var(--z-chrome, 20);
+  max-width: min(28rem, calc(100% - 2 * var(--ink-gap)));
+  margin: 0;
+  padding: var(--sp-2, 0.5rem) var(--sp-3, 0.75rem);
+  border-radius: var(--r-popover, 12px);
+  background: var(--paper-raised, #ffffff);
+  box-shadow: inset 0 0 0 var(--ink-hairline) var(--line-strong, #c6cad2), var(--shadow-sm, 0 1px 3px rgb(20 22 28 / 0.08));
+  color: var(--ink, #15171c);
+  font-size: var(--fs-ui, 0.8125rem);
+  line-height: var(--lh-snug, 1.35);
+  white-space: normal;
+  pointer-events: none;
+}
+
+/* "Tap again for pen options": a small bubble by the tool just taken,
+   the first times only (ink.js). It points at its button and takes no
+   press of its own. */
+.ink__coach {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: var(--z-popover, 40);
+  width: max-content;
+  max-width: min(24rem, calc(100% - 2 * var(--sp-2, 0.5rem)));
+  margin: 0;
+  padding: var(--sp-2, 0.5rem) var(--sp-3, 0.75rem);
+  border-radius: var(--r-popover, 12px);
+  background: var(--paper-raised, #ffffff);
+  box-shadow: inset 0 0 0 var(--ink-hairline) var(--line-strong, #c6cad2), var(--shadow-md, 0 4px 16px rgb(20 22 28 / 0.12));
+  color: var(--ink, #15171c);
+  font-size: var(--fs-ui, 0.8125rem);
+  font-weight: var(--fw-medium, 500);
+  line-height: var(--lh-snug, 1.35);
+  white-space: normal;
+  text-wrap: balance;
+  pointer-events: none;
+}
+.ink__coach::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--coach-arrow, 50%) - 5px);
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  box-shadow: inset var(--ink-hairline) var(--ink-hairline) 0 var(--line-strong, #c6cad2);
+  rotate: 45deg;
+}
+.ink__coach[data-side="below"]::before { top: -5px; }
+.ink__coach[data-side="above"]::before { bottom: -5px; rotate: 225deg; }
+
+/* ---------------------------------------------------------------- the popover */
+
+.ink__pop {
+  position: absolute;
+  z-index: var(--z-popover, 40);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3, 0.75rem);
+  width: max-content;
+  max-width: min(22rem, calc(100% - 2 * var(--sp-2, 0.5rem)));
+  max-height: calc(100% - 2 * var(--sp-2, 0.5rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-3, 0.75rem);
+  border-radius: var(--r-popover, 12px);
+  /* Solid, not glass: colour swatches must look like the colour they are. */
+  background: var(--paper-raised, #ffffff);
+  box-shadow: inset 0 0 0 var(--ink-hairline) var(--line-strong, #c6cad2), var(--shadow-md, 0 2px 6px rgb(20 22 28 / 0.06), 0 8px 24px rgb(20 22 28 / 0.10));
+  color: var(--ink, #15171c);
+  touch-action: manipulation;
+  transform-origin: var(--origin, 50% 0);
+}
+
+.ink__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 0.5rem);
+  min-width: 0;
+}
+.ink__row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ink__label {
+  margin: 0;
+  color: var(--ink-soft, #545a66);
+  font-size: var(--fs-xs, 0.75rem);
+  font-weight: var(--fw-medium, 500);
+  letter-spacing: var(--tr-small, 0.01em);
+}
+.ink__note {
+  margin: 0;
+  max-width: 18rem;
+  color: var(--ink-soft, #545a66);
+  font-size: var(--fs-xs, 0.75rem);
+  line-height: var(--lh-snug, 1.35);
+  white-space: normal;
+}
+
+.ink__radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tap-gap, 2px);
+}
+.ink__radios--stack { flex-direction: column; align-items: stretch; }
+
+.ink__radios--stack .ink__choice { justify-content: flex-start; padding: 0 var(--sp-3, 0.75rem) 0 var(--sp-2, 0.5rem); border-radius: var(--r-control, 8px); }
+.ink__radios--segmented {
+  padding: 2px;
+  border-radius: var(--r-control, 8px);
+  background: var(--paper-sunken, #f3f4f6);
+}
+.ink__radios--segmented .ink__choice {
+  flex: 1 1 0;
+  padding: 0 var(--sp-3, 0.75rem);
+  border-radius: calc(var(--r-control, 8px) - 2px);
+}
+.ink__radios--segmented .ink__choice[aria-checked="true"] {
+  background: var(--paper-raised, #ffffff);
+  color: var(--ink, #15171c);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(20 22 28 / 0.08));
+}
+.ink__choice-text { font-size: var(--fs-ui, 0.8125rem); }
+
+/* Colour swatches: the colour itself, with a ring when chosen. Shown on
+   the sheet they will be drawn on: a near-black ink on a dark popover would
+   vanish, and on the paper it reads as it will. */
+.ink__colors {
+  gap: var(--sp-1, 0.25rem);
+  max-width: calc(9 * (var(--ink-btn) + var(--sp-1, 0.25rem)) + 2 * var(--sp-1, 0.25rem));
+  padding: var(--sp-1, 0.25rem);
+  border-radius: var(--r-control, 8px);
+  background: var(--ink-sheet);
+  box-shadow: inset 0 0 0 var(--ink-hairline) var(--line-strong, #c6cad2);
+  color: var(--ink-on-sheet);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ink__colors .ink__choice:hover:not([aria-checked="true"]) { background-color: var(--ink-on-sheet-hover); }
+}
+.ink__color.ink__choice {
+  width: var(--ink-btn);
+  min-width: var(--ink-btn);
+  border-radius: 50%;
+}
+.ink__color.ink__choice::before {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px var(--ink-swatch-rim);
+}
+.ink__color.ink__choice[aria-checked="true"] {
+  background: transparent;
+  color: var(--ink-on-sheet);
+  box-shadow: inset 0 0 0 2px var(--ink-sel);
+}
+/* "Another colour": the wheel until one is picked, then that colour. */
+.ink__custom {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.ink__custom .ink__icon {
+  position: relative;
+  width: var(--icon-sm, 16px);
+  height: var(--icon-sm, 16px);
+  color: var(--ink-handle);
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 1px var(--ink-ring-dark));
+}
+/* The system picker opens from here; the field itself is never pressed. */
+.ink__custom-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ink__size-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 0.5rem);
+}
+.ink__range {
+  flex: 1 1 auto;
+  min-width: 8rem;
+  height: var(--ink-btn);
+  margin: 0;
+  accent-color: var(--accent, #2f7d5a);
+  touch-action: none;
+}
+.ink__nib {
+  flex: none;
+  width: var(--ink-nib-box);
+  height: var(--ink-nib-box);
+  border-radius: var(--r-control, 8px);
+  background: var(--ink-sheet);
+  box-shadow: inset 0 0 0 var(--ink-hairline) var(--line-strong, #c6cad2);
+}
+.ink__nib-eraser {
+  fill: none;
+  stroke: var(--ink-on-sheet);
+  stroke-width: 1;
+}
+.ink__size-value {
+  flex: none;
+  min-width: 3.5em;
+  color: var(--ink-soft, #545a66);
+  font-size: var(--fs-xs, 0.75rem);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ---------------------------------------------------------------- layouts */
+
+/* ink.js lays the bars out wide for a moment to learn their natural
+   width (it decides the layout): nothing clamps them then. */
+.ink[data-measure] .ink__bar { max-width: none; }
+
+.ink[data-layout="wide"] .ink__compact { display: none; }
+.ink[data-layout="compact"] .ink__wide { display: none; }
+
+.ink[data-layout="compact"] .ink__tools {
+  top: auto;
+  left: 50%;
+  bottom: calc(var(--ink-gap) + var(--safe-bottom, 0px));
+  translate: -50% 0;
+}
+.ink[data-layout="compact"] .ink__zoom { display: none; }
+.ink[data-layout="compact"] .ink__status-text { display: none; }
+/* Except a failure: a red dot alone does not say the drawing is not kept. */
+.ink[data-layout="compact"][data-save="failed"] .ink__status-text { display: inline; }
+.ink[data-layout="compact"] .ink__done-text { display: none; }
+.ink[data-layout="compact"] .ink__done { padding: 0; }
+.ink[data-layout="compact"] .ink__pop { max-width: calc(100% - 2 * var(--sp-2, 0.5rem)); }
+
+/* Looking, not drawing: only the way out, the zoom and the state remain. */
+.ink[data-readonly] .ink__tools,
+.ink[data-readonly] .ink__selbar,
+.ink[data-readonly] .ink__actions .ink__btn:not(.ink__done):not(.ink__host),
+.ink[data-readonly] .ink__actions .ink__sep { display: none; }
+.ink[data-readonly][data-layout="compact"] .ink__zoom { display: flex; }
+
+/* ---------------------------------------------------------------- motion */
+
+.ink__pop,
+.ink__selbar,
+.ink__coach {
+  transition:
+    opacity var(--dur-pop, 160ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    scale var(--dur-pop, 160ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    display var(--dur-pop, 160ms) allow-discrete;
+}
+.ink__pop[hidden],
+.ink__selbar[hidden],
+.ink__coach[hidden] {
+  opacity: 0;
+  scale: var(--pop-scale, 0.96);
+  transition-duration: calc(var(--dur-pop, 160ms) * 0.75);
+}
+@starting-style {
+  .ink__pop,
+  .ink__selbar,
+  .ink__coach {
+    opacity: 0;
+    scale: var(--pop-scale, 0.96);
+  }
+}
+.ink__btn,
+.ink__choice {
+  transition:
+    background-color var(--dur-hover, 120ms) ease,
+    color var(--dur-hover, 120ms) ease,
+    scale var(--dur-press, 100ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.ink__btn:active:not(:disabled) { scale: var(--press-scale, 0.97); }
+.ink__caret-icon { transition: opacity var(--dur-hover, 120ms) ease; }
+@media (prefers-reduced-motion: reduce) {
+  .ink__pop,
+  .ink__selbar,
+  .ink__coach { scale: none; }
+  .ink__pop[hidden],
+  .ink__selbar[hidden],
+  .ink__coach[hidden] { scale: none; }
+  .ink__btn:active:not(:disabled) { scale: none; }
+  @starting-style {
+    .ink__pop,
+    .ink__selbar,
+    .ink__coach { scale: none; }
+  }
+}
+
+/* ---------------------------------------------------------------- materials, fallbacks */
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ink__bar { background: var(--paper-raised, #ffffff); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-transparency]) .ink__bar {
+    background: var(--paper-raised, #ffffff);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+:root[data-transparency="reduce"] .ink__bar {
+  background: var(--paper-raised, #ffffff);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (prefers-contrast: more) {
+  .ink__bar {
+    background: var(--paper-raised, #ffffff);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px var(--line-control, #8a909b), var(--shadow-sm, 0 1px 3px rgb(20 22 28 / 0.08));
+  }
+}
+@media (forced-colors: active) {
+  .ink__bar,
+  .ink__pop,
+  .ink__notice,
+  .ink__coach {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .ink__btn[aria-pressed="true"],
+  .ink__choice[aria-checked="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .ink__color.ink__choice::before,
+  .ink__swatch,
+  .ink__status-dot,
+  .ink__surface { forced-color-adjust: none; }
+}
+
+@media print {
+  .ink__bar,
+  .ink__pop,
+  .ink__notice,
+  .ink__coach,
+  .ink__cursor,
+  .ink__pen-ring { display: none !important; }
+}

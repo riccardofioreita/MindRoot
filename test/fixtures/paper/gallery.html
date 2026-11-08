@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper gallery</title>
+<!-- MindRoot - every paper of js/features/paper.js at A4, light and dark,
+     plus the infinite canvas at a few zooms. Open it by double-click to judge
+     the drawings; test/fixtures/paper/shoot.js takes screenshots of it.
+     ?lang=it for Italian labels, ?only=<id> for one paper, ?size=a5,
+     ?orientation=landscape, ?bg=%23rrggbb for a custom background. -->
+<style>
+  :root { color-scheme: light dark; --gap: 16px; font: 13px/1.4 system-ui, sans-serif; }
+  body { margin: 0; padding: var(--gap); background: #e9eaec; color: #15171c; }
+  h2 { font-size: 15px; margin: 24px 0 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: var(--gap); }
+  figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  figure img { display: block; box-shadow: 0 1px 2px rgb(0 0 0 / .12), 0 6px 18px rgb(0 0 0 / .10); }
+  figure.dark { background: #131519; color: #e4e6ea; padding: 8px; border-radius: 8px; }
+  figcaption { font-size: 12px; }
+  .vp { display: block; border: 1px solid #c6cad2; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="../../../js/core/i18n.js"></script>
+<script src="../../../js/features/paper.js"></script>
+<script>
+(function () {
+  'use strict';
+  var ns = window.MindRoot;
+  var q = new URLSearchParams(location.search);
+  ns.i18n.init(q.get('lang') || 'en');
+  var P = ns.paper;
+  var only = q.get('only');
+  var width = Number(q.get('width')) || 260;
+  var size = { id: q.get('size') || 'a4', orientation: q.get('orientation') || undefined };
+  var bg = q.get('bg') || 'auto';
+  var root = document.getElementById('root');
+
+  function img(svg, w, h) {
+    var el = document.createElement('img');
+    el.width = w; el.height = h;
+    el.alt = '';
+    el.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    return el;
+  }
+
+  function figure(svg, w, h, caption, dark) {
+    var f = document.createElement('figure');
+    if (dark) f.className = 'dark';
+    f.appendChild(img(svg, w, h));
+    var c = document.createElement('figcaption');
+    c.textContent = caption;
+    f.appendChild(c);
+    return f;
+  }
+
+  var box = P.pageSize(size);
+  var h = Math.round(width * box.h / box.w);
+  var rendered = 0;
+  P.GROUPS.forEach(function (g) {
+    var items = P.CATALOG.filter(function (e) { return e.group === g.id && (!only || e.id === only); });
+    if (!items.length) return;
+    var title = document.createElement('h2');
+    title.textContent = P.groupLabel(g.id);
+    root.appendChild(title);
+    var row = document.createElement('div');
+    row.className = 'row';
+    items.forEach(function (e) {
+      ['light', 'dark'].forEach(function (theme) {
+        var svg = P.pageSvg({ type: e.id }, { size: size, theme: theme, background: bg, scale: width / box.w });
+        row.appendChild(figure(svg, width, h, P.label(e.id) + ' (' + theme + ')', theme === 'dark'));
+        rendered++;
+      });
+    });
+    root.appendChild(row);
+  });
+
+  /* Page thumbnails as the page rail shows them (scale 0.12): every paper
+   * must still read as itself, none may turn into a blank sheet. */
+  if (q.get('thumbs') !== '0') {
+    var t1 = document.createElement('h2');
+    t1.textContent = 'Thumbnails, scale 0.12';
+    root.appendChild(t1);
+    var trow = document.createElement('div');
+    trow.className = 'row';
+    P.CATALOG.filter(function (e) { return !only || e.id === only; }).forEach(function (e) {
+      var tw = Math.round(box.w * 0.12);
+      var th = Math.round(box.h * 0.12);
+      trow.appendChild(figure(P.pageSvg({ type: e.id }, { size: size, theme: 'light', scale: 0.12 }), tw, th, P.label(e.id), false));
+      rendered++;
+    });
+    root.appendChild(trow);
+  }
+
+  /* The infinite canvas: the same viewport (q.canvasW x q.canvasH screen
+   * px, 400 x 260 by default) at several zooms, the paper anchored to the
+   * origin in the middle of the view; the contract call (no mode). */
+  if (q.get('canvas') !== '0') {
+    var zooms = (q.get('zooms') || '0.05,0.15,0.3,0.5,1,3').split(',').map(Number);
+    var CW = Number(q.get('canvasW')) || 400;
+    var CH = Number(q.get('canvasH')) || 260;
+    var t2 = document.createElement('h2');
+    t2.textContent = 'Infinite canvas, zoom ' + zooms.join(' / ') + ' (x1 dark)';
+    root.appendChild(t2);
+    P.CATALOG.filter(function (e) { return !only || e.id === only; }).forEach(function (e) {
+      var row = document.createElement('div');
+      row.className = 'row';
+      zooms.forEach(function (k) {
+        var W = CW, H = CH;
+        var x = -W / 2 / k, y = -H / 2 / k, w = W / k, hh = H / k;
+        var frag = P.patternSvg({ type: e.id }, { x: x, y: y, w: w, h: hh, scale: k, theme: k === 1 ? 'dark' : 'light' });
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="' + x + ' ' + y + ' ' + w + ' ' + hh + '">' + frag + '</svg>';
+        row.appendChild(figure(svg, W, H, P.label(e.id) + ' x' + k, false));
+        rendered++;
+      });
+      root.appendChild(row);
+    });
+  }
+
+  var imgs = Array.prototype.slice.call(document.images);
+  Promise.all(imgs.map(function (el) { return el.decode().then(function () { return true; }, function () { return false; }); })).then(function (ok) {
+    window.galleryReady = { images: imgs.length, failed: ok.filter(function (x) { return !x; }).length, rendered: rendered };
+  });
+})();
+</script>
+</body>
+</html>

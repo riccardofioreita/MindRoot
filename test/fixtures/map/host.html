@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>map host</title>
+<!-- The map engine on its own: tokens, the font, base, motion and map
+     styles, the three core files it reads (strings, helpers, bus), colours,
+     and the three map files. No app, no session, no store: the e2e suites
+     drive window.view directly with the trees in trees.js, and wire
+     selection and knobs the way a session would. Stored pictures resolve
+     from window.assets (path -> blob: URL; window.pictureUrl(colour) makes
+     one). ?lang=it picks Italian; ?drag wires node dragging the way the
+     editor would (view.dragGhost). -->
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="../../../css/fonts.css">
+<link rel="stylesheet" href="../../../css/base.css">
+<link rel="stylesheet" href="../../../css/motion.css">
+<link rel="stylesheet" href="../../../css/map.css">
+<style>
+  #stage { position: fixed; inset: 0; overflow: hidden; background: var(--paper); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../../../js/core/util.js"></script>
+<script src="../../../js/core/i18n.js"></script>
+<script src="../../../js/core/bus.js"></script>
+<script src="../../../js/model/color.js"></script>
+<script src="../../../js/map/layout.js"></script>
+<script src="../../../js/map/gestures.js"></script>
+<script src="../../../js/map/mapview.js"></script>
+<script src="trees.js"></script>
+<script>
+  (function () {
+    'use strict';
+    var ns = window.MindRoot;
+    ns.i18n.init();
+    window.pictureUrl = function (color, h) {
+      return URL.createObjectURL(new Blob([
+        '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="' + (h || 110) + '"><rect width="220" height="' + (h || 110) + '" fill="' + color + '"/></svg>'
+      ], { type: 'image/svg+xml' }));
+    };
+    window.assets = { 'assets/blob-picture.png': window.pictureUrl('#4a7f8a') };
+    window.resolved = [];
+    window.log = [];
+    window.views = [];
+    window.mount = function (opts) {
+      if (window.view) window.view.destroy();
+      window.log = [];
+      window.resolved = [];
+      var view = ns.mapview.create(document.getElementById('stage'), {
+        resolveImage: function (path) {
+          window.resolved.push(path);
+          return new Promise(function (resolve) {
+            setTimeout(function () { resolve(window.assets[path] || null); }, 20);
+          });
+        }
+      });
+      ['select', 'activate', 'knob', 'background', 'context', 'note', 'link', 'task', 'image', 'fold', 'gesture', 'camera', 'render'].forEach(function (type) {
+        view.on(type, function (d) {
+          if (type === 'camera' || type === 'gesture' && d.state === 'idle') return;
+          window.log.push({ type: type, detail: d && JSON.parse(JSON.stringify(d, function (k, v) { return v instanceof Set ? Array.from(v) : v; })) });
+        });
+      });
+      /* What a session does with the view's reports. */
+      view.on('select', function (d) { view.select(d.path); });
+      view.on('background', function () { view.select(null); });
+      view.on('knob', function (d) { view.fold(d.path, d.folded, { deep: d.deep }); });
+      if (opts && opts.drag) {
+        var ghost = null;
+        view.on('dragstart', function (d) {
+          window.log.push({ type: 'dragstart', detail: d });
+          var box = view.rect(d.path);
+          window.dragFrom = { x: d.x, y: d.y, left: box.left, top: box.top, width: box.width, height: box.height };
+          ghost = view.dragGhost(d.path, { x: d.x, y: d.y });
+        });
+        view.on('dragmove', function (d) { if (ghost) window.lastTarget = ghost.move(d.x, d.y); });
+        view.on('dragend', function (d) {
+          var target = ghost && !d.cancelled ? ghost.drop() : null;
+          if (ghost && d.cancelled) ghost.cancel();
+          ghost = null;
+          window.log.push({ type: 'dragend', detail: { path: d.path, cancelled: d.cancelled, target: target } });
+        });
+      }
+      window.view = view;
+      return true;
+    };
+    window.show = function (name, opts, renderOpts) {
+      if (opts && opts.balance !== undefined) window.view.setOptions({ balance: opts.balance });
+      return window.view.render(window.MapTrees[name](), renderOpts || { animate: false });
+    };
+    window.events = function (type) {
+      return window.log.filter(function (e) { return !type || e.type === type; });
+    };
+    window.mount({ drag: /[?&]drag\b/.test(location.search) });
+  })();
+</script>
+</body>
+</html>

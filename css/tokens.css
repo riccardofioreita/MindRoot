@@ -1,0 +1,365 @@
+/* MindRoot - design tokens: colour, type, space, shape, layers, materials.
+ *
+ * Every value the interface uses is named here once, with the reason it has
+ * the value it has. Component CSS reads tokens and never writes a raw colour,
+ * size or layer number; motion durations and curves live in motion.css, the
+ * only other place allowed to define numbers.
+ *
+ * Colour is spent on the branches of the map, the only colour that carries
+ * meaning. The chrome is neutral grey plus one green accent; there is one
+ * rose for destructive things and one violet reserved for note markers. The
+ * contrast figures in the comments are measured against --paper (light) and
+ * --paper / --paper-raised (dark): AA for text, 3:1 for control boundaries.
+ *
+ * Dark values are written twice on purpose: once for "follow the system"
+ * (no data-theme on <html>) and once for the manual choice. The inline
+ * script in index.html sets data-theme before this sheet loads, so the right
+ * set applies on the first paint and nothing flashes.
+ *
+ * Breakpoints (media queries cannot read custom properties, so the numbers
+ * are repeated in chrome.css and js/app.js LAYOUT, which must agree):
+ *   compact < 640px, medium 640-1023px, expanded >= 1024px,
+ *   (max-height: 480px) landscape phones.
+ * Target size follows (pointer: coarse), never the width. */
+
+:root {
+  color-scheme: light;
+
+  /* ---------- surfaces and ink (light) ---------- */
+  --paper: #fbfbfc;
+  --paper-raised: #ffffff;
+  --paper-sunken: #f3f4f6;
+  --ink: #15171c;            /* 17.3:1 */
+  --ink-soft: #545a66;       /* 6.7:1, secondary text */
+  --ink-faint: #6b717c;      /* 4.75:1, tertiary text and placeholders (the old #878d99 failed at 3.2:1) */
+  --ink-disabled: #878d99;   /* disabled controls only, which WCAG exempts */
+  --line: #e3e5ea;           /* 1.2:1, decorative separators only */
+  --line-strong: #c6cad2;    /* card and panel edges */
+  --line-control: #8a909b;   /* input and control boundaries, 3.1:1 on paper (WCAG 1.4.11) */
+
+  --accent: #2f7d5a;         /* the MindRoot green, also branch colour one */
+  --on-accent: #ffffff;      /* 5.0:1 on the accent */
+  --accent-soft: rgb(47 125 90 / 0.10);
+  --accent-ink: #2a6f50;     /* accent used as text on paper: 5.8:1 */
+  --by-ai: #5b4bc4;          /* who wrote a node: the AI's violet, 6.6:1 on paper */
+  --by-ai-soft: rgb(91 75 196 / 0.10);
+  --danger: #b4485f;
+  --on-danger: #ffffff;      /* 5.2:1 */
+  --danger-soft: rgb(180 72 95 / 0.10);
+  --note: #8a5fbf;           /* note markers only; no branch colour may drift near it */
+  --focus: var(--accent);
+  --scrim: rgb(20 22 28 / 0.32);
+  --selection: rgb(47 125 90 / 0.22);
+
+  /* Hover and press tints are the ink at low alpha, so they read on every
+     surface (paper, raised, glass) without a per-surface value. */
+  --hover: rgb(20 22 28 / 0.06);
+  --pressed: rgb(20 22 28 / 0.10);
+
+  /* The deliberate inverse: tooltips and toasts are the one place the page
+     shows the other theme, because they must read over anything. The action
+     colour flips with them: green that works on near-black ink. */
+  --inverse: var(--ink);
+  --on-inverse: var(--paper);
+  --inverse-soft: rgb(251 251 252 / 0.72);
+  --inverse-accent: #86d7ad; /* 10.5:1 on --ink */
+  --inverse-hover: rgb(251 251 252 / 0.14);
+
+  /* ---------- materials ---------- */
+  /* Glass tints measured for the worst case: the seven branch colours, black
+     and white behind the glass. Regular (.72) keeps --ink at 9.6:1 but
+     --ink-soft drops to 3.7:1, so text on glass is always --ink. Bigger
+     surfaces read thicker: more tint and more blur than small chips. */
+  --glass-thin: rgb(255 255 255 / 0.60);
+  --glass-regular: rgb(255 255 255 / 0.72);
+  --glass-thick: rgb(255 255 255 / 0.86);
+  --glass-liquid: rgb(255 255 255 / 0.55);   /* under the optional refraction layer */
+  --glass-blur-thin: 10px;
+  --glass-blur-regular: 16px;
+  --glass-blur-thick: 24px;
+  --glass-sat: 170%;
+  --glass-rim: rgb(20 22 28 / 0.10);
+  --glass-highlight: rgb(255 255 255 / 0.75);
+  --glass-shadow: 0 1px 2px rgb(20 22 28 / 0.06), 0 8px 24px rgb(20 22 28 / 0.10);
+
+  /* A hairline of shadow doing the work a border would, plus one soft cast.
+     The third step exists for one state only: a panel held by the hand. */
+  --shadow-sm: 0 1px 1px rgb(20 22 28 / 0.04), 0 1px 3px rgb(20 22 28 / 0.06);
+  --shadow-md: 0 1px 1px rgb(20 22 28 / 0.04), 0 2px 6px rgb(20 22 28 / 0.06), 0 8px 24px rgb(20 22 28 / 0.10);
+  --shadow-lift: 0 1px 1px rgb(20 22 28 / 0.05), 0 4px 10px rgb(20 22 28 / 0.08), 0 18px 40px rgb(20 22 28 / 0.16);
+
+  /* Focus ring: accent, plus a paper halo on glass so it reads over a busy map. */
+  --focus-ring: 2px solid var(--focus);
+  --focus-offset: 2px;
+  --focus-halo: 0 0 0 4px rgb(251 251 252 / 0.70);
+
+  /* ---------- type ---------- */
+  /* System UI for the chrome (optical sizes, most legible at 12-13px);
+     Montserrat for the map, the brand and exports. */
+  --font-ui: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-brand: "Montserrat", var(--font-ui);
+  --font-map: "Montserrat", var(--font-ui);
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+
+  /* Six steps replace the old twelve ad-hoc sizes. rem, so the layout grows
+     with the reader's own text size. */
+  --fs-xs: 0.75rem;     /* 12: badges, kbd, captions */
+  --fs-sm: 0.8125rem;   /* 13: chrome on fine pointers */
+  --fs-md: 0.9375rem;   /* 15: body, and chrome on coarse pointers */
+  --fs-lg: 1.125rem;    /* 18: panel and dialog titles */
+  --fs-xl: 1.5rem;      /* 24: empty states */
+  --fs-2xl: 2rem;       /* 32: first run only */
+  --fs-ui: var(--fs-sm);
+  --fs-input: var(--fs-sm);
+  --map-fs: 15px;
+
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
+  --lh-body: 1.5;
+  --lh-loose: 1.65;
+
+  --fw-regular: 400;
+  --fw-medium: 500;     /* chrome labels and anything on glass */
+  --fw-semibold: 600;
+  --fw-display: 650;
+  --fw-bold: 700;
+
+  --tr-display: -0.015em;
+  --tr-title: -0.01em;
+  --tr-glass: 0.005em;
+  --tr-small: 0.01em;
+
+  /* ---------- space, shape, size ---------- */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+
+  /* Shape lock: floating bars are capsules; inline controls 8; menus and
+     popovers 12; panels, dialogs and sheets 16; chips and kbd 6. Inner radius
+     = outer radius - padding, so a 12px menu with 4px padding has 8px rows. */
+  --r-capsule: 999px;
+  --r-control: 8px;
+  --r-popover: 12px;
+  --r-panel: 16px;
+  --r-chip: 6px;
+
+  /* 32px visible on a mouse; 44px on a finger (Apple's 44pt). */
+  --control-h: 32px;
+  --row-h: 32px;
+  --icon: 20px;
+  --icon-sm: 16px;
+  --capsule-pad: 4px;
+  --bar-h: calc(var(--control-h) + 2 * var(--capsule-pad));
+  --tap-gap: 2px;
+
+  --sidebar-w: 17.5rem;
+  --drawer-w: min(20rem, 86vw);
+  --panel-w: min(26rem, calc(100vw - 2 * var(--sp-4)));
+  --dialog-w: min(30rem, calc(100vw - 2 * var(--sp-4)));
+  --toast-w: min(92vw, 26.25rem);
+  --menu-min-w: 13rem;
+  --menu-max-w: min(24rem, calc(100vw - 2 * var(--sp-3)));
+  --tooltip-max-w: 17.5rem;
+  --grip-w: 2.25rem;
+  --grip-h: 0.3125rem;
+  --dot: 8px;                 /* the save-state dot */
+  --edge-w: 20px;             /* the strip a finger swipes the drawer out of */
+  --badge: 1rem;
+  --fs-badge: 0.625rem;
+  --check: 1rem;              /* checkbox and radio */
+  --switch-w: 2.25rem;
+  --switch-h: 1.375rem;
+  --switch-pad: 3px;
+  --textarea-min: 5rem;
+  --field-lg: 3rem;           /* the palette's search field */
+  --banner-w: 40rem;
+  --sheet-w: 36rem;           /* centred sheet */
+  --sheet-h: 44rem;
+  --sheet-bottom-w: 40rem;    /* a bottom sheet on a wide phone or tablet in landscape */
+  --side-w: 24rem;            /* side sheet */
+  --palette-w: 40rem;
+  --palette-h: 32rem;
+  --palette-top: 12vh;
+  --empty-w: 28rem;
+  --card-w: 34rem;            /* boot failure */
+  --error-h: 12rem;
+  --avail-fallback: 70vh;     /* a popup's height before it has been placed */
+  --fade: var(--sp-4);        /* scroll-edge fade length */
+
+  /* Floating chrome keeps this far from the edges, plus the safe areas. */
+  --chrome-gap: 0.75rem;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  /* The part of the layout viewport an on-screen keyboard covers. js/app.js
+     writes it from visualViewport (iOS does not resize the layout viewport;
+     interactive-widget only helps Chrome on Android). */
+  --kb: 0px;
+  /* How far iOS has panned the visual viewport down to show a focused field
+     (also js/app.js): what is above it cannot be seen. */
+  --vv-top: 0px;
+  --dock-bottom: calc(var(--chrome-gap) + max(var(--safe-bottom), var(--kb)));
+  /* The highest a bottom sheet rests, as a share of the height above the
+     keyboard (read by ui.js too). */
+  --sheet-top: 0.92;
+
+  /* The map never shrinks below this, whatever is docked under it. */
+  --stage-min: 6rem;
+
+  /* ---------- layers (nothing else is allowed) ---------- */
+  --z-map: 0;
+  --z-map-overlay: 10;
+  --z-chrome: 20;
+  --z-panel: 30;
+  --z-popover: 40;
+  --z-sheet: 50;
+  --z-scrim: 55;
+  --z-dialog: 60;
+  --z-toast: 70;
+  --z-tooltip: 80;
+  --z-drag: 90;
+}
+
+@supports (height: 1dvh) {
+  :root { --stage-min: max(6rem, 25dvh); }
+}
+
+/* Fingers get room: 44px targets, 15px chrome text, 16px inputs (iOS zooms
+   into anything smaller when it takes focus). */
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+    --row-h: 44px;
+    --capsule-pad: 3px;
+    --fs-ui: var(--fs-md);
+    --fs-input: 1rem;
+  }
+}
+
+@media (max-width: 639px) {
+  :root { --chrome-gap: 0.5rem; }
+}
+
+/* ---------- dark, following the system ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #131519;
+    --paper-raised: #1a1d22;
+    --paper-sunken: #0f1114;
+    --ink: #e4e6ea;            /* 14.6:1 */
+    --ink-soft: #9ba1ac;       /* 7.0:1 */
+    --ink-faint: #858b95;      /* 5.3:1 on paper, 4.9:1 on raised */
+    --ink-disabled: #6b717c;
+    --line: #282c33;
+    --line-strong: #3a3f48;
+    --line-control: #727883;   /* 4.1:1 on paper, 3.8:1 on raised */
+    --accent: #4fae82;
+    --on-accent: #131519;      /* 6.7:1; white on this green is 2.7:1 and fails */
+    --accent-soft: rgb(79 174 130 / 0.14);
+    --accent-ink: #5cbb8f;
+    --by-ai: #a99bf2;
+    --by-ai-soft: rgb(169 155 242 / 0.14);
+    --danger: #d4667c;
+    --on-danger: #131519;      /* 5.2:1 */
+    --danger-soft: rgb(212 102 124 / 0.14);
+    --note: #b389e0;
+    --scrim: rgb(0 0 0 / 0.50);
+    --selection: rgb(79 174 130 / 0.30);
+    --hover: rgb(255 255 255 / 0.07);
+    --pressed: rgb(255 255 255 / 0.12);
+    --inverse-soft: rgb(19 21 25 / 0.72);
+    --inverse-accent: #1f6b4a; /* 5.2:1 on the light inverse surface */
+    --inverse-hover: rgb(19 21 25 / 0.10);
+    /* Dark glass needs more tint than light: at .72 --ink-soft is 2.5:1. */
+    --glass-thin: rgb(28 31 36 / 0.72);
+    --glass-regular: rgb(28 31 36 / 0.80);
+    --glass-thick: rgb(28 31 36 / 0.90);
+    --glass-liquid: rgb(28 31 36 / 0.74);
+    --glass-rim: rgb(255 255 255 / 0.08);
+    --glass-highlight: rgb(255 255 255 / 0.10);
+    --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.40), 0 10px 28px rgb(0 0 0 / 0.45);
+    /* In the dark a shadow cannot separate two surfaces on its own, so the
+       top edge catches a light hairline and the cast underneath does the rest. */
+    --shadow-sm: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 3px rgb(0 0 0 / 0.50);
+    --shadow-md: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 2px 6px rgb(0 0 0 / 0.40), 0 10px 28px rgb(0 0 0 / 0.50);
+    --shadow-lift: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 4px 12px rgb(0 0 0 / 0.50), 0 20px 44px rgb(0 0 0 / 0.60);
+    --focus-halo: 0 0 0 4px rgb(19 21 25 / 0.70);
+  }
+}
+
+/* ---------- dark, chosen by hand (same values, kept in step) ---------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #131519;
+  --paper-raised: #1a1d22;
+  --paper-sunken: #0f1114;
+  --ink: #e4e6ea;
+  --ink-soft: #9ba1ac;
+  --ink-faint: #858b95;
+  --ink-disabled: #6b717c;
+  --line: #282c33;
+  --line-strong: #3a3f48;
+  --line-control: #727883;
+  --accent: #4fae82;
+  --on-accent: #131519;
+  --accent-soft: rgb(79 174 130 / 0.14);
+  --accent-ink: #5cbb8f;
+  --by-ai: #a99bf2;
+  --by-ai-soft: rgb(169 155 242 / 0.14);
+  --danger: #d4667c;
+  --on-danger: #131519;
+  --danger-soft: rgb(212 102 124 / 0.14);
+  --note: #b389e0;
+  --scrim: rgb(0 0 0 / 0.50);
+  --selection: rgb(79 174 130 / 0.30);
+  --hover: rgb(255 255 255 / 0.07);
+  --pressed: rgb(255 255 255 / 0.12);
+  --inverse-soft: rgb(19 21 25 / 0.72);
+  --inverse-accent: #1f6b4a;
+  --inverse-hover: rgb(19 21 25 / 0.10);
+  --glass-thin: rgb(28 31 36 / 0.72);
+  --glass-regular: rgb(28 31 36 / 0.80);
+  --glass-thick: rgb(28 31 36 / 0.90);
+  --glass-liquid: rgb(28 31 36 / 0.74);
+  --glass-rim: rgb(255 255 255 / 0.08);
+  --glass-highlight: rgb(255 255 255 / 0.10);
+  --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.40), 0 10px 28px rgb(0 0 0 / 0.45);
+  --shadow-sm: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 3px rgb(0 0 0 / 0.50);
+  --shadow-md: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 2px 6px rgb(0 0 0 / 0.40), 0 10px 28px rgb(0 0 0 / 0.50);
+  --shadow-lift: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 4px 12px rgb(0 0 0 / 0.50), 0 20px 44px rgb(0 0 0 / 0.60);
+  --focus-halo: 0 0 0 4px rgb(19 21 25 / 0.70);
+}
+
+/* ---------- the pointer ----------
+   Inside the app the arrow is MindRoot's own: the navigation arrow of the
+   drawing editor's select tool (path M5.5 3.5l12.5 7-5.8 1.6-2.7 5.9z in a
+   24-unit box), filled with the ink of the theme and ringed with the paper,
+   so it reads on the map, the chrome and any drawing sheet. The 24-unit box
+   is drawn at 32 px from viewBox "1 0.5 24 24", so the tip (5.5, 3.5) lands
+   exactly on the pixel (6, 4): the hotspot. A vector picture: the browser
+   draws it at the screen's density, crisp at 1x and 2x. Not image-set():
+   with SVG pictures in it Chromium's renderer was seen to crash (the
+   journey-desktop suite, after a theme change). The colours are literal
+   because a data URL cannot read a custom property.
+   --mr-cursor is set only where a pointer that hovers exists, outside
+   forced colours (the system's cursors follow the high-contrast scheme),
+   and while the setting "MindRoot pointer" is on (html[data-cursor="system"]
+   when it is off). Rules use it as cursor: var(--mr-cursor, default), so
+   with it unset every place falls back to the system's own cursor. */
+:root {
+  --cursor-arrow-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='1 0.5 24 24'%3E%3Cpath d='M5.5 3.5l12.5 7-5.8 1.6-2.7 5.9z' fill='%2315171c' stroke='%23ffffff' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E") 6 4, default;
+  --cursor-arrow-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='1 0.5 24 24'%3E%3Cpath d='M5.5 3.5l12.5 7-5.8 1.6-2.7 5.9z' fill='%23e4e6ea' stroke='%2315171c' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E") 6 4, default;
+}
+@media (any-hover: hover) and (any-pointer: fine) and (forced-colors: none) {
+  :root:not([data-cursor="system"]) { --mr-cursor: var(--cursor-arrow-light); }
+  :root[data-theme="dark"]:not([data-cursor="system"]) { --mr-cursor: var(--cursor-arrow-dark); }
+}
+@media (any-hover: hover) and (any-pointer: fine) and (forced-colors: none) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-cursor="system"]) { --mr-cursor: var(--cursor-arrow-dark); }
+}

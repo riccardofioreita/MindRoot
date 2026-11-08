@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>core-prefs-blocked</title></head>
+<body>
+<pre id="out">LOADING</pre>
+<script>
+  /* A private window, or site data blocked: every access throws. */
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    get: function () { throw new DOMException('The operation is insecure.', 'SecurityError'); }
+  });
+</script>
+<script src="../../js/core/util.js"></script>
+<script src="../../js/core/i18n.js"></script>
+<script src="../../js/core/bus.js"></script>
+<script src="../../js/core/prefs.js"></script>
+<script src="../harness.js"></script>
+<script src="core-prefs-blocked.test.js"></script>
+<script>T.run();</script>
+</body>
+</html>

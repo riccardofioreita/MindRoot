@@ -1,0 +1,732 @@
+/* MindRoot - workspace: the projects tree, the trash and copies sheets,
+ * the palette's rows, settings, help and the welcome card.
+ *
+ * Solid surfaces only (lists are content, never glass), colour spent on
+ * nothing but the accent of what is current and the danger of what deletes,
+ * rows as tall as a finger on coarse pointers (--row-h), hover tints only
+ * where there is a mouse. Every size, colour and radius is a token from
+ * tokens.css; durations live in motion.css, which is why nothing here
+ * transitions. */
+
+/* ================================================================ sidebar */
+
+.sb {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.sb__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: calc(var(--bar-h) + var(--sp-2));
+  padding: var(--sp-2) var(--sp-2) var(--sp-1) var(--sp-4);
+}
+.sb__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb__actions { flex: none; display: flex; gap: var(--tap-gap); }
+
+.sb__scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1) var(--sp-2) var(--sp-3);
+  scroll-padding-block: var(--sp-4);
+}
+
+.sb-tree,
+.sb-group {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-item { outline: none; }
+.sb-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--row-h);
+  padding: 0 var(--sp-1) 0 var(--sp-2);
+  border-radius: var(--r-control);
+  color: var(--ink);
+  cursor: var(--mr-cursor, pointer);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.sb-item--map > .sb-row,
+.sb-item--new > .sb-row { padding-left: calc(var(--sp-2) + var(--icon) + var(--sp-2)); }
+
+/* The focus ring sits on the row, not around the whole project and its maps. */
+.sb-item:focus-visible > .sb-row {
+  outline: var(--focus-ring);
+  outline-offset: calc(-1 * var(--focus-offset));
+}
+
+.sb-caret {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--icon);
+  height: var(--icon);
+  margin-left: calc(-1 * var(--sp-1));
+  color: var(--ink-faint);
+}
+.sb-caret .icon { width: var(--icon-sm); height: var(--icon-sm); }
+/* A finger gets a whole row-tall square around the caret: the visible
+ * chevron stays small, the target it stands for does not. */
+@media (pointer: coarse) {
+  .sb-caret { position: relative; }
+  .sb-caret::before {
+    content: '';
+    position: absolute;
+    inset: calc((var(--icon) - var(--row-h)) / 2);
+  }
+}
+.sb-item[aria-expanded="true"] > .sb-row .sb-caret .icon { rotate: 90deg; }
+
+.sb-icon {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  color: var(--ink-soft);
+}
+.sb-item--project > .sb-row > .sb-icon { margin-left: calc(-1 * var(--sp-1)); }
+
+.sb-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  padding: var(--sp-1) 0;
+}
+.sb-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-item--project .sb-name { font-weight: var(--fw-medium); }
+.sb-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.sb-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+}
+.sb-count {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.sb-item--new > .sb-row { color: var(--ink-soft); }
+.sb-item--new .sb-icon { color: var(--ink-faint); }
+
+/* The project on show, and the map open in it: accent, never only colour
+   (weight and a filled row carry it too). */
+.sb-item--project.is-active > .sb-row > .sb-icon { color: var(--accent-ink); }
+.sb-item--map.is-current > .sb-row {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.sb-item--map.is-current .sb-name { font-weight: var(--fw-semibold); }
+/* On the accent ground the faint ink falls under 4.5:1. */
+.sb-item--map.is-current .sb-count,
+.sb-item--map.is-current .sb-meta { color: var(--ink-soft); }
+.sb-item--map.is-current .sb-icon { color: var(--accent-ink); }
+
+/* The row's menu button: visible on touch, on hover, on focus and on the
+   current row; there for keyboards and screen readers always. */
+.sb-more {
+  flex: none;
+  color: var(--ink-soft);
+  margin-left: auto;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sb-more { opacity: 0; }
+  .sb-row:hover .sb-more,
+  .sb-item:focus-visible > .sb-row .sb-more,
+  .sb-item.is-current > .sb-row .sb-more,
+  .sb-more[aria-expanded="true"],
+  .sb-more:focus-visible { opacity: 1; }
+  .sb-row:hover { background-color: var(--hover); }
+  .sb-item--map.is-current > .sb-row:hover { background-color: var(--accent-soft); }
+}
+
+.sb-empty {
+  padding: var(--sp-3) var(--sp-2);
+  color: var(--ink-soft);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-body);
+}
+
+/* Dragging a row: it stays in place, faded; a copy follows the pointer and
+   a line shows where it lands. */
+.sb-item[data-dragging] > .sb-row { opacity: 0.4; }
+html[data-sb-dragging],
+html[data-sb-dragging] * { cursor: grabbing !important; }
+.sb-ghost {
+  position: fixed;
+  z-index: var(--z-drag);
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-lift);
+  opacity: 0.95;
+}
+.sb-ghost .sb-more { visibility: hidden; }
+.sb-ghost[data-refused] { box-shadow: var(--shadow-lift), inset 0 0 0 2px var(--danger); }
+.sb-drop {
+  position: absolute;
+  left: var(--sp-2);
+  right: var(--sp-2);
+  height: 2px;
+  margin-top: -1px;
+  border-radius: var(--r-capsule);
+  background: var(--accent);
+  pointer-events: none;
+}
+.sb-drop[data-inner] { left: calc(var(--sp-2) + var(--icon) + var(--sp-2)); }
+
+/* The footer: five tools, an icon over a word, a tab bar of their own. */
+.sb__foot {
+  flex: none;
+  display: flex;
+  gap: var(--tap-gap);
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+.sb-tool {
+  /* Shared by what each label needs (in Italian, 'Images' is longer than
+     'Copies'), so a narrow column with finger-sized icons beside them still
+     fits every word. */
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: calc(var(--control-h) + var(--sp-3));
+  padding: var(--sp-1) 2px;
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+}
+.sb-tool .icon { width: var(--icon); height: var(--icon); }
+.sb-tool__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: var(--lh-snug);
+}
+.sb-tool[aria-disabled="true"] { color: var(--ink-disabled); }
+.sb-tool--icon { flex: none; width: var(--control-h); padding: 0; }
+.sb-tool--icon .sb-tool__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sb-tool:not(.sb-tool--icon) + .sb-tool--icon { margin-left: var(--sp-1); }
+.sb-badge {
+  top: 0;
+  right: calc(50% - var(--icon) / 2 - var(--badge) + 4px);
+}
+
+/* ================================================================ forms in dialogs */
+
+.ws-form { display: grid; gap: var(--sp-4); }
+.dialog--wide { width: min(40rem, calc(100vw - 2 * var(--sp-4))); }
+
+.ws-choices {
+  display: grid;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+}
+.ws-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  min-height: var(--row-h);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  cursor: var(--mr-cursor, pointer);
+}
+.ws-choice input { margin-top: 2px; }
+.ws-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.ws-choice__text { display: grid; gap: 2px; min-width: 0; }
+.ws-choice__title { font-weight: var(--fw-medium); overflow-wrap: anywhere; }
+.ws-choice__hint { font-size: var(--fs-xs); color: var(--ink-soft); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.ws-choices__sub { margin-top: var(--sp-2); }
+
+.ws-note {
+  color: var(--ink-soft);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+
+/* Import branches: the source map, a filter, the tree of boxes, the target. */
+.ws-ib { gap: var(--sp-3); }
+.ws-ib__bar { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ws-ib__bar .input { flex: 1 1 12rem; min-width: 0; }
+.ws-picktree {
+  max-height: min(18rem, 40vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: var(--sp-1);
+  list-style: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--paper);
+}
+.ws-pick { padding-left: calc(var(--depth, 0) * var(--sp-4)); }
+.ws-pick .check { min-height: var(--row-h); gap: var(--sp-2); }
+.ws-pick__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-pick__count { flex: none; font-size: var(--fs-xs); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.ws-pick input:disabled + .ws-pick__text { color: var(--ink-soft); }
+
+/* ================================================================ sheets: trash, copies */
+
+.ws-sheet .sheet__body { padding-top: 0; }
+.ws-panel { display: flex; flex-direction: column; gap: var(--sp-3); min-height: 0; }
+.ws-panel__top { display: grid; gap: var(--sp-2); }
+.ws-panel__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+}
+.ws-search { min-height: var(--control-h); }
+.ws-hint {
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+  line-height: var(--lh-snug);
+}
+
+/* Always there, so choosing the first row never moves the list. */
+.ws-bulk {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  padding: var(--sp-1) 0;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--line);
+}
+.ws-bulk__all { flex: 1 1 auto; min-width: 8rem; font-variant-numeric: tabular-nums; }
+.ws-bulk__actions { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.ws-bulk .btn--text { background: transparent; }
+
+.ws-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+/* The words keep at least a readable width; when the sheet is too narrow
+   for them and the actions side by side, the actions wrap below, at the
+   right (an armed delete says its words and needs the room). */
+.ws-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-1) var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--r-control);
+}
+.ws-row > .ws-row__hit,
+.ws-row > .ws-row__icon { flex: none; }
+.ws-row__hit {
+  display: grid;
+  place-items: center;
+  align-self: center;
+}
+/* A finger's target round the small native box: a control high and wide,
+   eating into the row's own padding rather than widening the row. */
+@media (pointer: coarse) {
+  .ws-row__hit {
+    min-width: var(--control-h);
+    min-height: var(--control-h);
+    margin: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-1)) calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2));
+  }
+}
+.ws-row > .ws-row__main { flex: 1 1 11rem; }
+/* The actions never push the row past its box: an armed "Sure? Press
+   again" is wider than a phone's row with the restore beside it, and the
+   buttons then wrap (the label shortens as a last resort). */
+.ws-row > .ws-row__actions { flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+.btn.ws-row__purge[data-armed] { max-width: 100%; min-width: 0; }
+.ws-row.is-chosen { background: var(--accent-soft); }
+.ws-row__icon {
+  display: grid;
+  place-items: center;
+  width: var(--icon);
+  height: var(--icon);
+  color: var(--ink-soft);
+  align-self: center;
+  cursor: var(--mr-cursor, pointer);
+}
+.ws-row__icon .icon,
+svg.ws-row__icon { width: var(--icon); height: var(--icon); color: var(--ink-soft); }
+.ws-row__main { display: grid; gap: 2px; min-width: 0; align-self: center; }
+.ws-row__check { align-self: center; }
+.ws-row__name {
+  font-weight: var(--fw-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-row__meta {
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+  line-height: var(--lh-snug);
+  overflow-wrap: anywhere;
+}
+.ws-trash .ws-row__name,
+.ws-trash .ws-row__meta { cursor: var(--mr-cursor, pointer); user-select: none; -webkit-user-select: none; }
+.ws-row__actions { display: flex; align-items: center; gap: var(--tap-gap); align-self: center; }
+.ws-row__actions .btn--text { background: transparent; }
+
+/* The preview opens wide on a press; closed it is two lines. */
+.ws-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin-top: var(--sp-1);
+  padding: 0;
+  text-align: left;
+  font-size: var(--fs-xs);
+  color: var(--ink-faint);
+  line-height: var(--lh-snug);
+  overflow-wrap: anywhere;
+  cursor: var(--mr-cursor, pointer);
+}
+.ws-preview[aria-expanded="true"] { display: block; -webkit-line-clamp: none; line-clamp: none; color: var(--ink-soft); }
+/* A finger needs the whole target, even for two short lines. */
+@media (pointer: coarse) {
+  .ws-preview { min-height: var(--row-h); padding: var(--sp-1) 0; }
+}
+.ws-thumb { display: block; margin-top: var(--sp-1); }
+.ws-thumb img {
+  max-width: min(100%, 12rem);
+  max-height: 6rem;
+  object-fit: contain;
+  border-radius: var(--r-chip);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* A delete that waits for its second press says so, in danger colour -
+   hovered or not (the pointer is still on it after the first press). */
+.ws-panel .btn[data-armed],
+.ws-panel .btn[data-armed][data-armed]:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--danger);
+  color: var(--on-danger);
+}
+.btn.ws-row__purge[data-armed] { width: auto; padding: 0 var(--sp-3); }
+.ws-row__purge .btn__label { display: none; }
+.ws-row__purge[data-armed] .btn__label { display: inline; }
+.ws-trash__empty { margin-right: auto; }
+
+@media (hover: hover) and (pointer: fine) {
+  .ws-row:not(.is-chosen):hover { background-color: var(--hover); }
+  .ws-preview:hover { color: var(--ink-soft); }
+}
+
+/* ---------------------------------------------------------------- copies */
+
+.ws-clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-ui);
+}
+.ws-every { width: 5.5rem; }
+.ws-unit { width: auto; min-width: 7rem; }
+.ws-copies > .ws-panel__top > .btn--primary { justify-self: start; }
+
+.ws-copies__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+/* The preview fills the sheet at whatever rest it sits, and the action it
+ * exists for stays pinned to the sheet's bottom edge: on a phone the sheet
+ * rests at 60% of the screen, and "Go back to it" must never wait below. */
+.ws-copies[data-mode="preview"] { min-height: 100%; }
+.ws-copies[data-mode="preview"] > .ws-panel__foot {
+  position: sticky;
+  /* Engines keep a sticky box inside the scroller's padding: the negative
+   * inset lets it reach down over the sheet's bottom padding. */
+  bottom: calc(-1 * var(--sp-4));
+  z-index: 1;
+  margin: auto calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4));
+  padding: var(--sp-2) var(--sp-4) var(--sp-4);
+  background: var(--paper-raised);
+}
+.ws-copies__map {
+  position: relative;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 10rem;
+  overflow: hidden;
+  border-radius: var(--r-control);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.ws-copies__map > .ws-note { padding: var(--sp-4); }
+
+.ws-diff { display: grid; gap: var(--sp-2); }
+.ws-diff__text {
+  max-height: min(26rem, 52dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-2) 0;
+  border-radius: var(--r-control);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+pre.ws-diff__text { margin: 0; padding: var(--sp-2) var(--sp-3); }
+.ws-diff__line { display: grid; grid-template-columns: 1.5em minmax(0, 1fr); padding: 0 var(--sp-3) 0 var(--sp-1); }
+.ws-diff__mark { text-align: center; color: var(--ink-faint); }
+.ws-diff__line[data-op="add"] { background: var(--accent-soft); }
+.ws-diff__line[data-op="add"] .ws-diff__mark { color: var(--accent-ink); }
+.ws-diff__line[data-op="del"] { background: var(--danger-soft); }
+.ws-diff__line[data-op="del"] .ws-diff__mark { color: var(--danger); }
+.ws-diff__line[data-op="del"] .ws-diff__words { text-decoration: line-through; text-decoration-color: var(--danger); }
+.ws-diff__skip {
+  padding: var(--sp-1) var(--sp-3);
+  color: var(--ink-faint);
+  font-family: var(--font-ui);
+  font-style: italic;
+}
+
+/* ================================================================ palette rows */
+
+.palette__item { grid-template-columns: var(--icon) minmax(0, 1fr) auto; }
+.palette__item .icon { color: var(--ink-soft); }
+.palette__main { display: grid; min-width: 0; }
+.palette__sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+}
+.palette__item[aria-disabled="true"] { color: var(--ink-disabled); cursor: var(--mr-cursor, default); }
+.palette__item[aria-disabled="true"] .icon { color: var(--ink-disabled); }
+.palette__state { font-size: var(--fs-xs); color: var(--ink-faint); }
+.palette__item[aria-checked="true"] .palette__label::after {
+  content: "";
+  display: inline-block;
+  width: var(--sp-2);
+  height: var(--sp-2);
+  margin-left: var(--sp-2);
+  border-radius: var(--r-capsule);
+  background: var(--accent);
+  vertical-align: middle;
+}
+.palette .kbd { white-space: nowrap; }
+.palette__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+}
+.palette__hint { font-size: var(--fs-xs); color: var(--ink-faint); }
+@media (hover: hover) and (pointer: fine) {
+  .palette__item:not([aria-selected="true"]):not([aria-disabled="true"]):hover { background-color: var(--hover); }
+}
+@media (pointer: coarse) {
+  .palette__hint { display: none; }
+}
+
+/* ================================================================ settings, help */
+
+.ws-settings,
+.ws-help { display: grid; gap: var(--sp-5); }
+.ws-section { display: grid; gap: var(--sp-3); }
+.ws-section__title {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-small);
+  color: var(--ink-soft);
+  text-transform: none;
+}
+.ws-set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-4);
+  min-height: var(--row-h);
+}
+.ws-set--seg { flex-wrap: wrap; }
+.ws-set__text { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
+.ws-set__label { font-weight: var(--fw-medium); cursor: var(--mr-cursor, default); }
+.ws-set--switch .ws-set__label { cursor: var(--mr-cursor, pointer); }
+.ws-set__hint {
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+  line-height: var(--lh-snug);
+  overflow-wrap: anywhere;
+}
+.ws-set__hint .icon { display: inline-block; width: var(--icon-sm); height: var(--icon-sm); vertical-align: -3px; }
+.ws-set .seg { flex: none; max-width: 100%; flex-wrap: wrap; }
+.ws-set .seg__opt .icon { width: var(--icon-sm); height: var(--icon-sm); }
+
+.ws-storage,
+.ws-backup { display: grid; gap: var(--sp-2); justify-items: start; }
+.ws-storage__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.ws-usage { font-variant-numeric: tabular-nums; }
+.ws-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-capsule);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  background: var(--paper-sunken);
+  color: var(--ink-soft);
+}
+.ws-badge[data-state="ok"] { background: var(--accent-soft); color: var(--accent-ink); }
+.ws-badge[data-state="warn"] { background: var(--danger-soft); color: var(--ink); }
+.ws-backup__actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.ws-about { display: flex; align-items: flex-start; gap: var(--sp-3); }
+.ws-about__logo { flex: none; width: 40px; height: 40px; }
+.ws-about > div { display: grid; gap: var(--sp-1); }
+.ws-about__name { font-weight: var(--fw-semibold); font-family: var(--font-brand); }
+
+.ws-help { gap: var(--sp-4); }
+.ws-help__part {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.ws-help__list { display: grid; gap: var(--sp-1); }
+.ws-help__row {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.ws-help__row:last-child { border-bottom: 0; }
+.ws-help__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-3);
+}
+.ws-help__title { font-weight: var(--fw-medium); min-width: 0; overflow-wrap: anywhere; }
+.ws-help__text { font-size: var(--fs-xs); color: var(--ink-soft); line-height: var(--lh-snug); }
+.ws-help__code {
+  justify-self: start;
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-chip);
+  background: var(--paper-sunken);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+.ws-keys { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
+.ws-keys__or { color: var(--ink-faint); font-size: var(--fs-xs); }
+
+/* ================================================================ welcome */
+
+/* Over the empty stage, clear of the floating bars; it scrolls if a short
+   screen cannot hold the card. */
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-map);
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--bar-h) + 2 * var(--chrome-gap)) max(var(--chrome-gap), var(--safe-right)) calc(var(--bar-h) + 2 * var(--chrome-gap)) max(var(--chrome-gap), var(--safe-left));
+  pointer-events: none;
+}
+.welcome > * { pointer-events: auto; }
+.welcome__card {
+  width: min(var(--empty-w), 100%);
+  margin: 0;
+  border-radius: 24px;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-md);
+  color: var(--ink);
+}
+.welcome__card.glass { background: var(--glass-thick); }
+.welcome__logo { width: 48px; height: 48px; }
+.welcome__drop {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+}
+.welcome__drop .icon { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
+@media (max-width: 639px) {
+  .welcome { padding-bottom: calc(var(--bar-h) * 2 + var(--chrome-gap)); }
+  .welcome__logo { display: none; }
+  .welcome__card { padding: var(--sp-4); }
+}
+@media (pointer: coarse) {
+  .welcome__drop { display: none; }
+}
+@media (max-height: 480px) {
+  .welcome__logo { display: none; }
+}
+html[data-mode="view"] .welcome { display: none; }
+
+/* ================================================================ special modes */
+
+@media (forced-colors: active) {
+  .sb-item--map.is-current > .sb-row,
+  .ws-row.is-chosen { outline: 2px solid Highlight; outline-offset: -2px; }
+  .sb-drop { background: Highlight; }
+  .ws-badge { border: 1px solid CanvasText; }
+}
+
+@media print {
+  .welcome { display: none; }
+}

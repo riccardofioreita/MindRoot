@@ -1,0 +1,524 @@
+/* MindRoot - editing on the map: the node toolbar, the format bar, the
+ * rename fields inside a node box, the note bubble and sheet, the colour
+ * picker, and the refused-drop feedback of a node drag.
+ *
+ * The two bars are the floating functional layer (regular glass capsules);
+ * the bubble and the picker are content (solid surfaces: a glass tint behind
+ * a note or a swatch would change what is read or chosen). Everything sits
+ * in #floaters, over the stage, except the picker, which is fixed to the
+ * window so it can also open under a swatch outside the stage.
+ *
+ * Motion: bars, bubble and picker grow from the side facing what they
+ * belong to (opacity and scale, --dur-pop) when they appear, and never when
+ * the keyboard moved them ([data-instant]). Their transitions are written
+ * here with the motion tokens, so a component keeps its motion wherever it
+ * is mounted; durations and curves come only from css/motion.css. */
+
+/* ---------------------------------------------------------------- component tokens */
+
+/* The few values the editor's parts need that tokens.css has no name for,
+   each named once with its reason; the rules below read only tokens. The
+   JS reads the lengths it places things with (--bar-gap, --bar-margin,
+   --note-gap, --note-min-w/h) from here, resolved to px. */
+:root {
+  --ed-hairline: 1px;           /* a separator or an edge: one CSS pixel, whatever the zoom */
+  --ed-ring: 2px;               /* a pressed swatch's ring and a rail's focus ring */
+  --ed-note-edge: 3px;          /* the note colour's edge on the bubble */
+  /* Swatches show a colour, not the theme: their rim is black at low alpha
+     in both themes, so a pale swatch keeps its edge on light paper and a
+     dark one on dark paper. */
+  --ed-swatch-rim: rgb(0 0 0 / 0.14);
+  --ed-thumb-rim: rgb(0 0 0 / 0.35);
+  --ed-dim: 0.4;                /* a control that cannot act now */
+  --ed-ghost-refused: 0.6;      /* a dragged node over a place that refuses it */
+  /* iOS zooms the page into a focused field written smaller than 16 CSS
+     pixels, whatever the reader's text size: a pixel floor on purpose. */
+  --ed-ios-floor: 16px;
+  /* The smallest title the rename opens on with a mouse: below it the map
+     zooms in first (a fitted big map), so the words being written can be read. */
+  --ed-read-fine: 12px;
+}
+
+.node-toolbar,
+.format-bar {
+  --bar-gap: var(--sp-2);       /* between a bar and the node it belongs to */
+  --bar-margin: var(--sp-2);    /* kept from the stage edges */
+}
+.note-bubble {
+  --bar-margin: var(--sp-2);
+  --note-gap: var(--sp-3);      /* between the bubble and its node or curve */
+  --note-w: 18rem;              /* about 40 characters a line at --fs-md */
+  --note-min-w: 13.75rem;       /* the head's four controls and a word of title */
+  --note-min-h: 8.75rem;        /* the head, two lines of text and the hint */
+  --note-text-min: 4.5rem;
+  --note-corner: 1rem;
+}
+.note-sheet {
+  --note-sheet-min: 8rem;       /* five lines before the sheet scrolls */
+  --note-sheet-max: 50vh;       /* the other half stays for the keyboard */
+}
+
+/* The strip a bar or panel is carried by (core/float.js). */
+.bar-grip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sp-4);
+  align-self: stretch;
+  color: var(--ink-faint);
+  cursor: grab;
+  touch-action: none;
+  border-radius: var(--r-capsule);
+}
+.bar-grip .icon { width: var(--icon-sm); height: var(--icon-sm); }
+[data-moving] .bar-grip { cursor: grabbing; }
+@media (pointer: coarse) {
+  .bar-grip { width: var(--sp-5); }
+}
+
+.bar-sep {
+  flex: none;
+  width: var(--ed-hairline);
+  align-self: stretch;
+  margin: var(--sp-2) var(--sp-1);
+  background: var(--line-strong);
+}
+
+/* ---------------------------------------------------------------- the node toolbar */
+
+.node-toolbar {
+  position: absolute;
+  z-index: var(--z-map-overlay);
+  left: 0;
+  top: 0;
+  max-width: calc(100% - 2 * var(--bar-margin));
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  transform-origin: var(--origin-x, 50%) 100%;
+}
+.node-toolbar[data-side="bottom"] { transform-origin: var(--origin-x, 50%) 0; }
+.node-toolbar[data-side="right"] { transform-origin: 0 50%; }
+.node-toolbar[data-side="left"] { transform-origin: 100% 50%; }
+.node-toolbar::-webkit-scrollbar { display: none; }
+.node-toolbar[hidden] { display: none; }
+.node-toolbar[data-moving] { box-shadow: var(--shadow-lift); }
+
+/* The colour of the node, as a disc on the button. */
+.node-toolbar__color .chip {
+  width: var(--icon);
+  height: var(--icon);
+  border-radius: 50%;
+  background: var(--chip, var(--accent));
+  box-shadow: inset 0 0 0 var(--ed-hairline) var(--ed-swatch-rim);
+}
+.node-toolbar__color[aria-disabled="true"] .chip { opacity: var(--ed-dim); }
+
+/* ---------------------------------------------------------------- the format bar */
+
+.format-bar {
+  position: absolute;
+  z-index: var(--z-map-overlay);
+  left: 0;
+  top: 0;
+  max-width: calc(100% - 2 * var(--bar-margin));
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  transform-origin: 50% 100%;
+}
+.format-bar[data-side="bottom"] { transform-origin: 50% 0; }
+.format-bar::-webkit-scrollbar { display: none; }
+.format-bar[hidden] { display: none; }
+.format-bar[data-moving] { box-shadow: var(--shadow-lift); }
+.format-bar .btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+/* On a phone the bar docks above the thumb bar (and with it above the
+   keyboard: --dock-bottom carries the keyboard's height). */
+.format-bar[data-docked] {
+  position: fixed;
+  z-index: var(--z-panel);
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: calc(var(--dock-bottom) + var(--bar-h) + var(--sp-2));
+  width: fit-content;
+  max-width: calc(100vw - 2 * var(--chrome-gap));
+  margin-inline: auto;
+  transform-origin: 50% 100%;
+}
+.format-bar[data-docked] .bar-grip { display: none; }
+/* Eight finger-sized buttons fit a 390 px phone only without the gaps
+   between them; narrower phones scroll the bar sideways. */
+.format-bar[data-docked] { gap: 0; }
+.format-bar[data-docked] .bar-sep { margin-inline: calc(var(--sp-1) / 2); }
+
+/* ---------------------------------------------------------------- the rename fields */
+
+/* Written where it is drawn: the node keeps its size, type and colour; the
+   field only gains a caret, a faint ground and its placeholder. */
+.mv-node--editing { z-index: 1; }
+.mv .mv-edit {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+  cursor: text;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 2em;
+  min-height: calc(1em * var(--lh-snug));
+  outline: none;
+  caret-color: var(--accent);
+  border-radius: var(--r-chip);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 var(--sp-1) var(--accent-soft);
+}
+.mv .mv-edit:focus { background: var(--selection); box-shadow: 0 0 0 var(--sp-1) var(--selection); }
+.mv .mv-edit:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+.mv .mv-edit--body { min-width: 6em; }
+/* A body written for the first time: the same box as a body read from the
+   file, so nothing jumps when it is saved. */
+.mv-body--new { display: block; }
+/* The node's free text, shown under the field it is not written in. */
+.mv-edit-prose {
+  padding-top: var(--mv-body-gap);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  /* iOS zooms into a field written smaller than 16px. */
+  .mv .mv-edit { font-size: max(1em, var(--ed-ios-floor)); }
+}
+
+/* ---------------------------------------------------------------- the note bubble */
+
+.note-bubble {
+  position: absolute;
+  z-index: var(--z-panel);
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  width: var(--note-w);
+  min-width: var(--note-min-w);
+  min-height: var(--note-min-h);
+  max-width: calc(100% - 2 * var(--bar-margin));
+  max-height: calc(100% - 2 * var(--bar-margin));
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  background: var(--paper-raised);
+  color: var(--ink);
+  border: var(--ed-hairline) solid var(--line-strong);
+  border-top: var(--ed-note-edge) solid var(--note);
+  border-radius: var(--r-popover);
+  box-shadow: var(--shadow-md);
+  transform-origin: 50% 100%;
+}
+.note-bubble[data-side="bottom"] { transform-origin: 50% 0; }
+.note-bubble[hidden] { display: none; }
+.note-bubble[data-kind="edge"] { border-top-style: dashed; }
+.note-bubble[data-moving] { box-shadow: var(--shadow-lift); }
+
+.note-bubble__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--control-h);
+}
+.note-bubble__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.note-bubble__text {
+  flex: 1 1 auto;
+  min-height: var(--note-text-min);
+  width: 100%;
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-2);
+  resize: none;
+  border: var(--ed-hairline) solid var(--line-control);
+  border-radius: var(--r-control);
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--fw-regular) var(--fs-md) / var(--lh-body) var(--font-ui);
+  white-space: pre-wrap;
+}
+.note-bubble__text:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 var(--ed-hairline) var(--focus);
+}
+.note-bubble[data-readonly] .note-bubble__text { background: transparent; border-color: transparent; }
+.note-bubble__hint {
+  margin: var(--sp-1) var(--note-corner) 0 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  color: var(--ink-faint);
+}
+.note-bubble__hint[hidden] { display: none; }
+.note-bubble__delete { flex: none; color: var(--danger); }
+.note-bubble__delete[hidden] { display: none; }
+.note-bubble__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--note-corner);
+  height: var(--note-corner);
+  cursor: nwse-resize;
+  touch-action: none;
+  border-bottom-right-radius: var(--r-popover);
+  background:
+    linear-gradient(135deg, transparent 50%, var(--line-control) 50%, var(--line-control) 58%, transparent 58%, transparent 70%, var(--line-control) 70%, var(--line-control) 78%, transparent 78%);
+}
+.note-bubble[data-resizing] { -webkit-user-select: none; user-select: none; }
+@media (pointer: coarse) {
+  .note-bubble { --note-corner: 1.5rem; }
+  .note-bubble__text { font-size: max(var(--fs-md), var(--ed-ios-floor)); }
+}
+
+/* On a phone: a bottom sheet (core/ui.js) with the text and two buttons. */
+.note-sheet { display: grid; gap: var(--sp-2); }
+.note-sheet__text {
+  min-height: var(--note-sheet-min);
+  max-height: var(--note-sheet-max);
+  resize: vertical;
+  font-size: max(var(--fs-md), var(--ed-ios-floor));
+}
+
+/* ---------------------------------------------------------------- the colour picker */
+
+.colorpicker {
+  --cp-w: 17.5rem;
+  --cp-chip: 1.75rem;
+  --cp-area-h: 8.5rem;
+  --cp-rail-h: 0.875rem;
+  --cp-thumb: 1rem;
+  --cp-action-min: 7rem;        /* Automatic and Random side by side when they fit */
+  --cp-label-w: 2.5rem;         /* 'Hex' and 'RGB' */
+  --cp-white: #ffffff;          /* the colour model's own ends, not theme colours */
+  --cp-black: #000000;
+  --cp-red: #ff0000;            /* hue 0, before a colour is chosen */
+  --cp-spectrum: #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000;
+  position: fixed;
+  z-index: var(--z-popover);
+  left: 0;
+  top: 0;
+  width: var(--cp-w);
+  max-width: calc(100vw - 2 * var(--sp-2));
+  max-height: var(--avail-h, var(--avail-fallback));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1) var(--sp-3) var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+  background: var(--paper-raised);
+  color: var(--ink);
+  border: var(--ed-hairline) solid var(--line-strong);
+  border-radius: var(--r-popover);
+  box-shadow: var(--shadow-md);
+  transform-origin: var(--origin, 50% 0);
+}
+.colorpicker[hidden] { display: none; }
+/* The panel takes the focus only to keep it inside when a swatch it held
+   was rebuilt; the swatches show focus, the panel does not. */
+.colorpicker:focus { outline: none; }
+.colorpicker[data-moving] { box-shadow: var(--shadow-lift); }
+/* Inside a sheet the sheet is the surface. */
+.colorpicker[data-sheet] {
+  position: static;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  padding: 0 0 var(--sp-3);
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.colorpicker[data-sheet] .colorpicker__head { display: none; }
+
+.colorpicker__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+}
+.colorpicker__title { flex: 1 1 auto; font-size: var(--fs-ui); font-weight: var(--fw-semibold); }
+.colorpicker__sample {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  border-radius: 50%;
+  background: var(--chip, var(--accent));
+  box-shadow: inset 0 0 0 var(--ed-hairline) var(--ed-swatch-rim);
+}
+
+.cp-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--cp-chip), 1fr));
+  gap: var(--sp-1);
+}
+/* Room for the ring round the chosen chip: in a sheet the first row sits
+   at the top edge of a scrolling body, which would cut the ring flat. */
+.colorpicker-sheet .cp-palette { padding-top: calc(2 * var(--ed-ring)); }
+.cp-row[hidden],
+.cp-label[hidden] { display: none; }
+.cp-label { font-size: var(--fs-xs); color: var(--ink-soft); }
+.cp-chip {
+  position: relative;
+  width: var(--cp-chip);
+  height: var(--cp-chip);
+  border-radius: 50%;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 var(--ed-hairline) var(--ed-swatch-rim);
+  justify-self: center;
+}
+/* A mouse gets a target --sp-1 wider all round than the swatch (36px around
+   28px, as the icon buttons get); on a finger the swatch itself is 44px. */
+.cp-chip::after { content: ""; position: absolute; inset: calc(-1 * var(--sp-1)); border-radius: 50%; }
+.cp-chip[aria-pressed="true"] {
+  box-shadow: 0 0 0 var(--ed-ring) var(--paper-raised), 0 0 0 calc(2 * var(--ed-ring)) var(--ink);
+}
+.cp-chip:focus-visible { outline: var(--focus-ring); outline-offset: calc(2 * var(--ed-ring)); }
+@media (pointer: coarse) {
+  .colorpicker { --cp-chip: 2.75rem; --cp-thumb: 1.5rem; --cp-rail-h: 1.5rem; --cp-area-h: 10rem; }
+}
+
+/* Side by side when both labels fit whole, one under the other when not
+   ("Random colour" never shrinks to "Random ..."). */
+.cp-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.cp-actions .btn { flex: 1 1 var(--cp-action-min); justify-content: flex-start; min-width: max-content; }
+.cp-actions .btn[hidden] { display: none; }
+.cp-custom-toggle { justify-self: start; }
+
+.cp-custom { display: grid; gap: var(--sp-3); }
+.cp-custom[hidden] { display: none; }
+
+.cp-area,
+.cp-hue {
+  position: relative;
+  border-radius: var(--r-control);
+  touch-action: none;
+  cursor: crosshair;
+  outline: none;
+}
+.cp-area {
+  height: var(--cp-area-h);
+  background:
+    linear-gradient(to top, var(--cp-black), transparent),
+    linear-gradient(to right, var(--cp-white), var(--hue, var(--cp-red)));
+}
+.cp-hue {
+  height: var(--cp-rail-h);
+  margin-inline: calc(var(--cp-thumb) / 2);
+  background: linear-gradient(to right, var(--cp-spectrum));
+  border-radius: var(--r-capsule);
+}
+.cp-area:focus-visible,
+.cp-hue:focus-visible { box-shadow: 0 0 0 var(--ed-ring) var(--paper-raised), 0 0 0 calc(2 * var(--ed-ring)) var(--focus); }
+.cp-thumb {
+  position: absolute;
+  width: var(--cp-thumb);
+  height: var(--cp-thumb);
+  margin: calc(var(--cp-thumb) / -2) 0 0 calc(var(--cp-thumb) / -2);
+  border-radius: 50%;
+  background: var(--chip);
+  box-shadow: 0 0 0 var(--ed-ring) var(--cp-white), 0 0 0 calc(var(--ed-ring) + var(--ed-hairline)) var(--ed-thumb-rim), var(--shadow-sm);
+  pointer-events: none;
+}
+.cp-hue .cp-thumb { top: 50%; }
+
+.cp-fields { display: grid; gap: var(--sp-2); }
+.cp-field-row {
+  display: grid;
+  grid-template-columns: var(--cp-label-w) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.cp-field-label { font-size: var(--fs-xs); color: var(--ink-soft); }
+.cp-field { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.cp-copy[data-copied] { color: var(--accent-ink); }
+
+.cp-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding-top: var(--sp-2);
+  border-top: var(--ed-hairline) solid var(--line);
+  font-size: var(--fs-ui);
+}
+.cp-switch-row[hidden] { display: none; }
+.cp-switch-text { min-width: 0; }
+
+/* ---------------------------------------------------------------- dragging a node */
+
+/* A place the model would refuse (a to-do among sub-headings, a shape the
+   file cannot hold): no ring, no line, and the copy says so. */
+html[data-drop-refused] .mv-node--drop { box-shadow: none; }
+html[data-drop-refused] .mv-drop-line { visibility: hidden; }
+html[data-drop-refused] .mv-ghost { opacity: var(--ed-ghost-refused); }
+html[data-node-drag],
+html[data-node-drag] * { cursor: grabbing; }
+html[data-drop-refused],
+html[data-drop-refused] * { cursor: not-allowed; }
+
+/* ---------------------------------------------------------------- motion */
+
+.node-toolbar,
+.format-bar,
+.note-bubble,
+.colorpicker {
+  transition:
+    opacity var(--dur-pop) var(--ease-out),
+    scale var(--dur-pop) var(--ease-out),
+    display var(--dur-pop) allow-discrete;
+}
+.node-toolbar[hidden],
+.format-bar[hidden],
+.note-bubble[hidden],
+.colorpicker[hidden] {
+  opacity: 0;
+  scale: var(--pop-scale);
+  transition-duration: calc(var(--dur-pop) * 0.75);   /* leaving is quicker than arriving, as in motion.css */
+}
+@starting-style {
+  .node-toolbar,
+  .format-bar,
+  .note-bubble,
+  .colorpicker {
+    opacity: 0;
+    scale: var(--pop-scale);
+  }
+}
+/* The keyboard moved it, a hand is carrying it, or it lives in a sheet:
+   it is simply there. */
+.node-toolbar[data-instant],
+.format-bar[data-instant],
+.node-toolbar[data-moving],
+.format-bar[data-moving],
+.note-bubble[data-moving],
+.colorpicker[data-moving],
+.colorpicker[data-sheet] { transition: none; }
+
+/* ---------------------------------------------------------------- materials, contrast */
+
+@media (forced-colors: active) {
+  .mv .mv-edit { background: Canvas; box-shadow: 0 0 0 var(--ed-hairline) Highlight; }
+  .note-bubble,
+  .colorpicker { border: var(--ed-hairline) solid CanvasText; }
+  .cp-chip { forced-color-adjust: none; border: var(--ed-hairline) solid CanvasText; }
+  .node-toolbar__color .chip { forced-color-adjust: none; }
+}

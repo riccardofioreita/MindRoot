@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="MindRoot">
+<title>MindRoot</title>
+<defs>
+<linearGradient id="g0" gradientUnits="userSpaceOnUse" x1="14.00" y1="32.00" x2="53.00" y2="11.00">
+<stop offset="0" stop-color="#2f7d5a"/>
+<stop offset="0.24" stop-color="#2f7d5a"/>
+<stop offset="0.5" stop-color="#357686"/>
+<stop offset="0.76" stop-color="#3b6ea5"/>
+<stop offset="1" stop-color="#3b6ea5"/>
+</linearGradient>
+<linearGradient id="g1" gradientUnits="userSpaceOnUse" x1="14.00" y1="32.00" x2="53.00" y2="32.00">
+<stop offset="0" stop-color="#2f7d5a"/>
+<stop offset="0.24" stop-color="#2f7d5a"/>
+<stop offset="0.5" stop-color="#90774d"/>
+<stop offset="0.76" stop-color="#c2703d"/>
+<stop offset="1" stop-color="#c2703d"/>
+</linearGradient>
+<linearGradient id="g2" gradientUnits="userSpaceOnUse" x1="14.00" y1="32.00" x2="53.00" y2="53.00">
+<stop offset="0" stop-color="#2f7d5a"/>
+<stop offset="0.24" stop-color="#2f7d5a"/>
+<stop offset="0.5" stop-color="#86675d"/>
+<stop offset="0.76" stop-color="#b4485f"/>
+<stop offset="1" stop-color="#b4485f"/>
+</linearGradient>
+</defs>
+<g fill="none" stroke-linecap="round">
+<path d="M14.00,32.00 C33.50,32.00 33.50,11.00 53.00,11.00" stroke="url(#g0)" stroke-width="6.00"/>
+<path d="M14.00,32.00 C33.50,32.00 33.50,32.00 53.00,32.00" stroke="url(#g1)" stroke-width="6.00"/>
+<path d="M14.00,32.00 C33.50,32.00 33.50,53.00 53.00,53.00" stroke="url(#g2)" stroke-width="6.00"/>
+</g>
+<circle cx="14.00" cy="32.00" r="9.50" fill="#2f7d5a"/>
+<circle cx="53.00" cy="11.00" r="6.50" fill="#3b6ea5"/>
+<circle cx="53.00" cy="32.00" r="6.50" fill="#c2703d"/>
+<circle cx="53.00" cy="53.00" r="6.50" fill="#b4485f"/>
+</svg>

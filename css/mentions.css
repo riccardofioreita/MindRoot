@@ -1,0 +1,37 @@
+/* MindRoot - mentions (js/features/mentions.js): the list a mention is
+ * chosen from and the "Mentioned by" list. Tokens only; one row per place,
+ * its words and, beneath, where it is. */
+.mn-pick { display: grid; gap: var(--sp-3, 12px); }
+.mn-search { width: 100%; }
+.mn-list { display: grid; gap: var(--sp-1, 4px); margin: 0; padding: 0; list-style: none; }
+.mn-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  min-height: 44px;
+  padding: var(--sp-1, 4px) var(--sp-2, 8px);
+  border-radius: var(--r-control, 8px);
+  color: var(--ink, #1d2129);
+  cursor: pointer;
+}
+.mn-row--button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: start;
+}
+.mn-row.is-active,
+.mn-row:focus-visible { background: var(--accent-soft, rgb(47 125 90 / 0.10)); outline: none; }
+@media (hover: hover) and (pointer: fine) {
+  .mn-row:hover { background: var(--accent-soft, rgb(47 125 90 / 0.10)); }
+}
+.mn-row__icon { flex: none; display: grid; place-items: center; color: var(--ink-soft, #545a66); }
+.mn-row__icon .icon { width: var(--icon-sm, 16px); height: var(--icon-sm, 16px); }
+.mn-row[data-kind="map"] .mn-row__label { font-weight: var(--fw-medium, 500); }
+.mn-row__words { display: grid; min-width: 0; }
+.mn-row__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mn-row__where { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs, 0.75rem); color: var(--ink-soft, #545a66); }
+.mn-row__where:empty { display: none; }
+.mn-note { margin: 0; color: var(--ink-soft, #545a66); font-size: var(--fs-sm, 0.875rem); }
+.mn-note:empty { display: none; }

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>core-prefs</title></head>
+<body>
+<pre id="out">LOADING</pre>
+<script>
+  /* What an older version, a hand edit or a bug might have left behind:
+   * prefs.js must keep what is valid and drop the rest. */
+  localStorage.setItem('mindroot2:prefs', JSON.stringify({
+    v: 1,
+    prefs: {
+      theme: 'dark',
+      lang: 'de',
+      liquidGlass: 'yes',
+      sidebarOpen: false,
+      sourceHeight: 7,
+      expanded: { p1: true, p2: 'open', p3: false },
+      copies: { every: 0, unit: 'd', extra: 1 },
+      export: { format: 'pdf', notes: false, junk: true },
+      pen: { tool: 'marker', color: '#123456', size: 500, eraser: 'stroke' },
+      noteSize: { w: 300, h: 200 },
+      myModule: { open: true, side: 'r' },
+      direction: 'both',
+      removedLongAgo: 42
+    }
+  }));
+</script>
+<script src="../../js/core/util.js"></script>
+<script src="../../js/core/i18n.js"></script>
+<script src="../../js/core/bus.js"></script>
+<script src="../../js/core/prefs.js"></script>
+<script src="../harness.js"></script>
+<script src="core-prefs.test.js"></script>
+<script>T.run();</script>
+</body>
+</html>

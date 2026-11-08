@@ -1,0 +1,23 @@
+/* MindRoot - the one bundled typeface.
+ *
+ * Montserrat as a variable font: one 37 KB file covers every weight the map,
+ * the brand and the exports ask for. Loaded by relative path, which works
+ * from file:// (fonts are not subject to the fetch restrictions scripts and
+ * JSON are). The chrome uses the system UI font and loads nothing.
+ *
+ * The latin subset leaves out s-acute, l-stroke, o-double-acute and
+ * Vietnamese; those characters fall back to the system font, which is the
+ * honest outcome for a subset.
+ *
+ * Montserrat by Julieta Ulanovsky et al., SIL Open Font License 1.1. */
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("fonts/montserrat-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

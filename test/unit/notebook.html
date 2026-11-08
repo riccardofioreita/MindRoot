@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>notebook</title>
+<link rel="stylesheet" href="../../css/tokens.css">
+<link rel="stylesheet" href="../../css/ink.css">
+<link rel="stylesheet" href="../../css/notebook.css">
+<style>
+  #out { position: fixed; left: 0; bottom: 0; margin: 0; max-height: 30vh; overflow: auto; font-size: 9px; z-index: 100; background: #fff; }
+  #host { position: fixed; left: 0; top: 0; width: 900px; height: 640px; }
+</style>
+</head>
+<body>
+<div id="host"></div>
+<pre id="out">LOADING</pre>
+<script src="../../js/core/util.js"></script>
+<script src="../../js/core/i18n.js"></script>
+<script src="../../js/core/bus.js"></script>
+<script src="../../js/core/prefs.js"></script>
+<script src="../../js/core/ui.js"></script>
+<script src="../../js/model/color.js"></script>
+<script src="../../js/model/doc.js"></script>
+<script src="../../js/model/store.js"></script>
+<script src="../../js/model/storage.js"></script>
+<script src="../../js/features/paper.js"></script>
+<script src="../../js/features/ink.js"></script>
+<script src="../../js/features/notebook.js"></script>
+<script src="../harness.js"></script>
+<script src="notebook.test.js"></script>
+<script>T.run();</script>
+</body>
+</html>

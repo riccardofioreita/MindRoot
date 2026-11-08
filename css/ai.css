@@ -1,0 +1,575 @@
+/* MindRoot - AI assistance (js/features/ai-ui.js): the card that offers how a
+ * title or a note might go on, the panel of suggested branches, and the few
+ * pieces of the Settings block that the other settings do not have. */
+
+/* The suggestion under the field being written: small, quiet, never in the
+   way of the words (it sits below the field, not on them). */
+.ai-ghost {
+  position: fixed;
+  z-index: var(--z-popover, 60);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2, 8px);
+  max-width: min(32rem, calc(100vw - 16px));
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong, #c6cad2);
+  border-radius: var(--r-control, 8px);
+  background: var(--surface, #fff);
+  color: var(--ink-soft, #545a66);
+  font-size: var(--fs-sm, 0.875rem);
+  box-shadow: var(--shadow-1, 0 2px 8px rgb(0 0 0 / 0.12));
+  pointer-events: none;
+}
+.ai-ghost[hidden] { display: none; }
+.ai-ghost__key {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong, #c6cad2);
+  border-radius: 4px;
+  font: inherit;
+  font-size: var(--fs-xs, 0.75rem);
+  color: var(--ink-soft, #545a66);
+}
+.ai-ghost__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+}
+
+/* Settings -> AI. */
+.ai-set__intro { margin: 0 0 var(--sp-3, 12px); }
+.ai-set__sub { margin: var(--sp-4, 16px) 0 var(--sp-1, 4px); font-size: var(--fs-sm, 0.875rem); font-weight: var(--fw-medium, 500); }
+.ai-set__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2, 8px); margin: var(--sp-2, 8px) 0; }
+.ai-set__actions .input { flex: 1 1 10rem; min-width: 0; }
+.ai-set .input { width: 100%; max-width: 20rem; }
+.ai-set__note[data-kind="ok"] { color: var(--success, #2f7d5a); }
+.ai-set__note[data-kind="error"] { color: var(--danger, #b3261e); }
+.ai-set__note[data-kind="warn"] { color: var(--warning, #8a5a00); }
+
+/* The branches panel. */
+.ai-panel { display: grid; gap: var(--sp-3, 12px); }
+.ai-panel__list { display: grid; gap: var(--sp-1, 4px); margin: 0; padding: 0; list-style: none; }
+.ai-panel__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  min-height: 40px;
+  padding: 4px 8px;
+  border-radius: var(--r-control, 8px);
+  cursor: var(--mr-cursor, pointer);
+}
+.ai-panel__item:hover { background: var(--hover, rgb(0 0 0 / 0.05)); }
+.ai-panel__item input { width: 18px; height: 18px; flex: none; accent-color: var(--accent, #2f7d5a); }
+.ai-panel__actions { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); }
+.ai-panel__busy, .ai-panel__empty { margin: 0; color: var(--ink-soft, #545a66); }
+.ai-panel__error { margin: 0; color: var(--danger, #b3261e); }
+
+@media (forced-colors: active) {
+  .ai-ghost { border-color: CanvasText; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ai-ghost { animation: ai-ghost-in 120ms ease-out; }
+  @keyframes ai-ghost-in { from { opacity: 0; transform: translateY(2px); } }
+}
+
+/* The window of its own: a form read from the top, each field a label, its
+   control, and the words that explain it under it. */
+.ai-config { width: min(36rem, calc(100vw - 24px)); }
+.ai-form { display: grid; gap: var(--sp-4, 16px); }
+.ai-form__intro { margin: 0; color: var(--ink-soft, #545a66); font-size: var(--fs-sm, 0.875rem); }
+.ai-form__sub { margin: var(--sp-2, 8px) 0 calc(var(--sp-2, 8px) * -1); font-size: var(--fs-sm, 0.875rem); font-weight: var(--fw-medium, 500); }
+.ai-field { display: grid; gap: var(--sp-1, 4px); min-width: 0; }
+.ai-field__label { font-weight: var(--fw-medium, 500); cursor: var(--mr-cursor, default); }
+.ai-field__hint { margin: 0; color: var(--ink-soft, #545a66); font-size: var(--fs-sm, 0.875rem); }
+.ai-field .input, .ai-field .select { width: 100%; min-width: 0; }
+.ai-field .seg { justify-self: start; max-width: 100%; flex-wrap: wrap; }
+.ai-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2, 8px); }
+.ai-row .input { flex: 1 1 14rem; min-width: 0; }
+.ai-row--end { justify-content: flex-end; margin-top: calc(var(--sp-2, 8px) * -1); }
+.ai-model { display: grid; gap: var(--sp-2, 8px); justify-items: start; }
+.ai-model .input, .ai-model .select { width: 100%; }
+.ai-switch { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3, 12px); }
+.ai-switch__text { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
+.ai-form__note[data-kind="ok"] { color: var(--success, #2f7d5a); }
+.ai-form__note[data-kind="error"] { color: var(--danger, #b3261e); }
+.ai-form__note[data-kind="warn"] { color: var(--warning, #8a5a00); }
+.ai-form__note:empty { display: none; }
+
+/* An icon for a node: five emoji to choose from. */
+.ai-emoji { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); }
+.ai-emoji__btn {
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--line-strong, #c6cad2);
+  border-radius: var(--r-control, 8px);
+  background: var(--surface, #fff);
+  font-size: 30px;
+  line-height: 1;
+  cursor: var(--mr-cursor, pointer);
+}
+.ai-emoji__btn:hover { background: var(--hover, rgb(0 0 0 / 0.05)); }
+.ai-emoji__btn:focus-visible { outline: 2px solid var(--accent, #2f7d5a); outline-offset: 2px; }
+
+/* Pictures for a node: the description, three to choose from. */
+.ai-pics__text { width: 100%; resize: vertical; min-height: 5.5rem; font: inherit; }
+.ai-pics__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2, 8px); }
+.ai-pic {
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--r-control, 8px);
+  background: var(--surface, #fff);
+  overflow: hidden;
+  cursor: var(--mr-cursor, pointer);
+  aspect-ratio: 1;
+}
+.ai-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ai-pic[aria-checked="true"] { border-color: var(--accent, #2f7d5a); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #2f7d5a) 30%, transparent); }
+.ai-pic:focus-visible { outline: 2px solid var(--accent, #2f7d5a); outline-offset: 2px; }
+
+/* Describe a picture: the picture (reduced), then a title and a description to take or leave. */
+.ai-desc__pic { display: block; max-width: 100%; max-height: 16rem; margin: 0 auto; border-radius: var(--r-control, 8px); object-fit: contain; background: var(--surface, #fff); }
+
+/* ================================================================ the panels, on stage
+ *
+ * Every AI panel (branches, icon, pictures, description) opens in the middle
+ * of the screen on a glass of its own, over a softly blurred scrim. While the
+ * model works the panel shows a sphere of light circling round a sparkle,
+ * shimmering placeholder lines, and its rim lights up and travels round it:
+ * the one place in the app where something is made by a model says so
+ * without a word. Reduced motion keeps the colours and drops the travel
+ * (the sphere breathes instead); reduced transparency and more contrast
+ * give back a plain surface. */
+.ai-sheet, .ai-config {
+  --ai-1: #7c5cff;
+  --ai-2: #22b8e0;
+  --ai-3: var(--accent, #2f7d5a);
+}
+.sheet.ai-sheet {
+  position: relative;
+  width: min(34rem, calc(100% - 2 * var(--sp-4, 16px)));
+  overflow: hidden;
+  background: var(--glass-thick, rgb(255 255 255 / 0.86));
+  -webkit-backdrop-filter: blur(var(--glass-blur-thick, 24px)) saturate(var(--glass-sat, 1.6));
+  backdrop-filter: blur(var(--glass-blur-thick, 24px)) saturate(var(--glass-sat, 1.6));
+  box-shadow: inset 0 0 0 0.5px var(--glass-rim, rgb(255 255 255 / 0.6)), inset 0 1px 0 var(--glass-highlight, rgb(255 255 255 / 0.8)), var(--shadow-lg, 0 24px 60px rgb(20 22 28 / 0.28));
+}
+.sheet.ai-sheet[data-modal]::backdrop {
+  background: color-mix(in srgb, var(--scrim, rgb(20 22 28 / 0.32)) 85%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+/* Light drifting in the glass, always faintly there, brighter at work. */
+.sheet.ai-sheet::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 38% at 22% 28%, color-mix(in srgb, var(--ai-1) 22%, transparent), transparent 70%),
+    radial-gradient(34% 34% at 78% 24%, color-mix(in srgb, var(--ai-2) 20%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 60% 86%, color-mix(in srgb, var(--ai-3) 20%, transparent), transparent 70%);
+  opacity: 0.55;
+  transition: opacity 400ms ease;
+}
+.sheet.ai-sheet:has(.ai-busy)::before { opacity: 1; }
+.sheet.ai-sheet > * { position: relative; z-index: 1; }
+
+/* The rim that travels. */
+@property --ai-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.sheet.ai-sheet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(from var(--ai-angle), transparent 0 52%, var(--ai-2) 68%, var(--ai-1) 82%, var(--ai-3) 94%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.sheet.ai-sheet:has(.ai-busy)::after { opacity: 1; }
+
+/* The sphere. */
+.ai-busy { display: grid; justify-items: center; gap: var(--sp-3, 12px); padding: var(--sp-4, 16px) 0 var(--sp-2, 8px); }
+.ai-busy .ai-panel__busy { color: var(--ink, #1d2129); font-weight: var(--fw-medium, 500); }
+.ai-orb {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.08) 46%), color-mix(in srgb, var(--paper-raised, #fff) 55%, transparent);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5), inset 0 -10px 22px color-mix(in srgb, var(--ai-1) 18%, transparent), 0 10px 30px color-mix(in srgb, var(--ai-1) 30%, transparent);
+}
+.ai-orb__blob { position: absolute; width: 62%; height: 62%; border-radius: 50%; filter: blur(14px); mix-blend-mode: multiply; opacity: 0.85; }
+.ai-orb__blob--a { left: 6%; top: 8%; background: var(--ai-1); }
+.ai-orb__blob--b { right: 4%; top: 22%; background: var(--ai-2); }
+.ai-orb__blob--c { left: 26%; bottom: 2%; background: var(--ai-3); }
+.ai-orb__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from var(--ai-angle), transparent 0 40%, rgb(255 255 255 / 0.95) 70%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.ai-orb__spark { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; filter: drop-shadow(0 1px 6px rgb(0 0 0 / 0.35)); }
+.ai-orb__spark .icon { width: 34px; height: 34px; fill: currentColor; stroke: currentColor; stroke-width: 1; }
+
+/* Where the answer will go. */
+.ai-skel { display: grid; gap: 10px; width: 100%; padding-top: var(--sp-2, 8px); }
+.ai-skel__line {
+  height: 14px;
+  border-radius: var(--r-capsule, 999px);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ink, #1d2129) 7%, transparent) 25%, color-mix(in srgb, var(--ai-2) 22%, transparent) 50%, color-mix(in srgb, var(--ink, #1d2129) 7%, transparent) 75%);
+  background-size: 300% 100%;
+}
+.ai-skel__line:nth-child(2) { width: 82%; }
+.ai-skel__line:nth-child(3) { width: 64%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet.ai-sheet:has(.ai-busy)::after { animation: ai-travel 2.6s linear infinite; }
+  .sheet.ai-sheet::before { animation: ai-drift 18s ease-in-out infinite alternate; }
+  .ai-orb__ring { animation: ai-travel 1.8s linear infinite; }
+  .ai-orb__blob--a { animation: ai-orbit-a 5.5s ease-in-out infinite; }
+  .ai-orb__blob--b { animation: ai-orbit-b 7s ease-in-out infinite; }
+  .ai-orb__blob--c { animation: ai-orbit-c 6.2s ease-in-out infinite; }
+  .ai-orb__spark { animation: ai-breathe 2.4s ease-in-out infinite; }
+  .ai-skel__line { animation: ai-shimmer 1.6s linear infinite; }
+  .ai-skel__line:nth-child(2) { animation-delay: -0.4s; }
+  .ai-skel__line:nth-child(3) { animation-delay: -0.8s; }
+  .ai-panel__item { animation: ai-rise 380ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  .ai-panel__item:nth-child(2) { animation-delay: 50ms; }
+  .ai-panel__item:nth-child(3) { animation-delay: 100ms; }
+  .ai-panel__item:nth-child(4) { animation-delay: 150ms; }
+  .ai-panel__item:nth-child(5) { animation-delay: 200ms; }
+  .ai-panel__item:nth-child(n+6) { animation-delay: 250ms; }
+  .ai-emoji__btn, .ai-pic { animation: ai-rise 380ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  @keyframes ai-travel { to { --ai-angle: 360deg; } }
+  @keyframes ai-drift { from { transform: translate(-4%, -3%) rotate(0deg); } to { transform: translate(4%, 3%) rotate(12deg); } }
+  @keyframes ai-orbit-a { 50% { transform: translate(34%, 22%) scale(1.15); } }
+  @keyframes ai-orbit-b { 50% { transform: translate(-30%, 30%) scale(0.9); } }
+  @keyframes ai-orbit-c { 50% { transform: translate(24%, -34%) scale(1.2); } }
+  @keyframes ai-breathe { 50% { transform: scale(1.12); } }
+  @keyframes ai-shimmer { from { background-position: 100% 0; } to { background-position: -200% 0; } }
+  @keyframes ai-rise { from { opacity: 0; transform: translateY(8px); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-orb__spark { animation: ai-pulse 2.8s ease-in-out infinite; }
+  @keyframes ai-pulse { 50% { opacity: 0.6; } }
+}
+
+/* A plain surface when transparency or contrast asks for one. */
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-transparency]) .sheet.ai-sheet { background: var(--paper-raised, #fff); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+:root[data-transparency="reduce"] .sheet.ai-sheet { background: var(--paper-raised, #fff); -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (prefers-contrast: more) {
+  .sheet.ai-sheet { background: var(--paper-raised, #fff); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 0 0 1px var(--line-control, #8a8f9a), var(--shadow-sm); }
+  .sheet.ai-sheet::before { display: none; }
+}
+@media (forced-colors: active) {
+  .sheet.ai-sheet::before, .sheet.ai-sheet::after, .ai-orb__blob { display: none; }
+  .ai-orb { border: 2px solid CanvasText; }
+}
+
+/* On the dark theme the light adds up instead of staining. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ai-orb__blob { mix-blend-mode: screen; opacity: 0.7; }
+}
+:root[data-theme="dark"] .ai-orb__blob { mix-blend-mode: screen; opacity: 0.7; }
+
+/* ================================================================ ghost suggestions
+ *
+ * Words: written faintly right after the caret, in the field's own type at
+ * the map's zoom (ai-ui.js copies the font), a small Tab mark at their end.
+ * Branches: up to three faint chips beside the selected node, on the side
+ * its children grow, each joined to it by a faint dashed thread; the first
+ * carries the Tab mark. Both come in quickly and quietly (opacity and a
+ * small shift, ease-out), and never take a pointer but the chips' own. */
+.ai-inline {
+  position: fixed;
+  z-index: var(--z-popover, 60);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ai-inline[hidden] { display: none; }
+.ai-inline__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; opacity: 0.38; }
+.ai-inline__key {
+  flex: none;
+  align-self: center;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font: 500 10px/14px var(--font-ui, system-ui, sans-serif);
+  opacity: 0.3;
+}
+
+.ai-sprouts {
+  position: fixed;
+  z-index: var(--z-popover, 60);
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.ai-sprouts[hidden] { display: none; }
+.ai-sprouts__wires {
+  position: absolute;
+  overflow: visible;
+  fill: none;
+  stroke: var(--by-ai, #5b4bc4);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 4;
+  stroke-linecap: round;
+  opacity: 0.35;
+}
+.ai-sprouts__list {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.ai-sprouts[data-side="left"] .ai-sprouts__list { justify-items: end; }
+.ai-sprout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 16rem;
+  padding: 3px 10px;
+  border: 1px dashed color-mix(in srgb, var(--by-ai, #5b4bc4) 45%, transparent);
+  border-radius: var(--r-capsule, 999px);
+  /* Faint words on a paper of their own: what lies under a chip does not
+     show through its letters. */
+  background: var(--paper, #fff);
+  color: color-mix(in srgb, var(--ink, #15171c) 45%, transparent);
+  font: inherit;
+  font-size: var(--fs-sm, 0.875rem);
+  cursor: var(--mr-cursor, pointer);
+  pointer-events: auto;
+  transition: color 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out;
+}
+.ai-sprout:first-child { color: color-mix(in srgb, var(--ink, #15171c) 62%, transparent); }
+@media (hover: hover) and (pointer: fine) {
+  .ai-sprout:hover { color: var(--ink, #15171c); border-color: var(--by-ai, #5b4bc4); }
+}
+.ai-sprout:active { transform: scale(0.97); }
+.ai-sprout__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-sprout__key {
+  flex: none;
+  padding: 0 4px;
+  border: 1px solid var(--line, #e3e5ea);
+  border-radius: 4px;
+  font: 500 10px/14px var(--font-ui, system-ui, sans-serif);
+  color: var(--ink-soft, #545a66);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ai-inline:not([hidden]) { animation: ai-ghost-fade 160ms ease-out; }
+  .ai-sprout { animation: ai-sprout-in 200ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both; }
+  .ai-sprout:nth-child(2) { animation-delay: 40ms; }
+  .ai-sprout:nth-child(3) { animation-delay: 80ms; }
+  .ai-sprouts__wires { animation: ai-ghost-fade 200ms ease-out both; }
+  .ai-sprouts[data-side="left"] .ai-sprout { animation-name: ai-sprout-in-left; }
+  @keyframes ai-ghost-fade { from { opacity: 0; } }
+  @keyframes ai-sprout-in { from { opacity: 0; transform: translateX(-6px); } }
+  @keyframes ai-sprout-in-left { from { opacity: 0; transform: translateX(6px); } }
+}
+@media (forced-colors: active) {
+  .ai-sprout { border-color: CanvasText; color: CanvasText; }
+  .ai-inline__text { opacity: 0.6; }
+}
+
+/* ================================================================ the chat
+ *
+ * Two columns from 760 px: the chats kept on the left, the conversation on
+ * the right; one column under it, the list above the conversation and
+ * shorter. The conversation scrolls on its own, the box stays at its foot. */
+.sheet.aichat-sheet { width: min(60rem, calc(100vw - 24px)); }
+/* A chat keeps its size as it fills: the messages scroll inside it. */
+.sheet.aichat-sheet:not([data-place="bottom"]) { height: min(46rem, calc(100% - 2 * var(--sp-6, 24px) - var(--kb, 0px) - var(--vv-top, 0px))); }
+.sheet.aichat-sheet .sheet__body { display: flex; min-height: 0; }
+.aichat {
+  display: grid;
+  grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr);
+  gap: var(--sp-4, 16px);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.aichat__side { display: flex; flex-direction: column; gap: var(--sp-2, 8px); min-height: 0; }
+.aichat__side > .btn { justify-content: center; }
+.aichat__filter { align-self: stretch; }
+.aichat__filter .seg__opt { flex: 1 1 0; }
+.aichat__chats { flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0; padding: 0; list-style: none; display: grid; align-content: start; gap: 2px; }
+.aichat__empty { padding: var(--sp-2, 8px); color: var(--ink-faint, #6b717c); font-size: var(--fs-sm, 0.875rem); }
+.aichat__row { display: flex; align-items: center; gap: 2px; border-radius: var(--r-control, 8px); }
+.aichat__row:hover, .aichat__row:focus-within { background: var(--hover, rgb(0 0 0 / 0.05)); }
+.aichat__open {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 1px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-control, 8px);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: var(--mr-cursor, pointer);
+}
+.aichat__open[aria-current="true"] { background: color-mix(in srgb, var(--by-ai, #5b4bc4) 12%, transparent); }
+.aichat__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm, 0.875rem); }
+.aichat__when { color: var(--ink-faint, #6b717c); font-size: var(--fs-xs, 0.75rem); }
+.aichat__mark, .aichat__del { flex: none; opacity: 0; transition: opacity 120ms ease-out; }
+.aichat__row:hover .aichat__mark, .aichat__row:hover .aichat__del,
+.aichat__row:focus-within .aichat__mark, .aichat__row:focus-within .aichat__del,
+.aichat__row--marked .aichat__mark { opacity: 1; }
+.aichat__row--marked .aichat__mark { color: var(--by-ai, #5b4bc4); }
+@media (hover: none) { .aichat__mark, .aichat__del { opacity: 1; } }
+.aichat__kept { margin: 0; }
+
+.aichat__main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.aichat__log { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--sp-3, 12px); padding: 2px 4px var(--sp-3, 12px) 0; overscroll-behavior: contain; }
+.aichat__hello { margin: auto 0; display: grid; gap: var(--sp-2, 8px); justify-items: start; }
+.aichat__hello-title { margin: 0; font-size: var(--fs-lg, 1.125rem); font-weight: var(--fw-medium, 500); }
+.aichat__starters { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); margin-top: var(--sp-2, 8px); }
+.aichat__starter {
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong, #c6cad2);
+  border-radius: var(--r-capsule, 999px);
+  background: var(--paper-raised, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-sm, 0.875rem);
+  cursor: var(--mr-cursor, pointer);
+  transition: border-color 120ms ease-out, transform 120ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) { .aichat__starter:hover { border-color: var(--by-ai, #5b4bc4); } }
+.aichat__starter:active { transform: scale(0.97); }
+.aichat__msg { display: grid; gap: 2px; max-width: 46rem; }
+.aichat__msg--user { align-self: flex-end; justify-items: end; }
+.aichat__who { color: var(--ink-faint, #6b717c); font-size: var(--fs-xs, 0.75rem); font-weight: var(--fw-medium, 500); }
+.aichat__msg--ai .aichat__who { color: var(--by-ai, #5b4bc4); }
+.aichat__text { display: grid; gap: var(--sp-2, 8px); overflow-wrap: anywhere; }
+.aichat__text p { margin: 0; line-height: var(--lh-normal, 1.5); }
+.aichat__msg--user .aichat__text { padding: 8px 12px; border-radius: 14px 14px 4px 14px; background: color-mix(in srgb, var(--accent, #2f7d5a) 12%, var(--paper-raised, #fff)); white-space: pre-wrap; }
+.aichat__msg--busy .ai-busy { justify-items: start; }
+.aichat__proposal { display: grid; gap: var(--sp-2, 8px); padding: var(--sp-3, 12px); border: 1px solid color-mix(in srgb, var(--by-ai, #5b4bc4) 35%, transparent); border-radius: var(--r-card, 12px); background: color-mix(in srgb, var(--by-ai, #5b4bc4) 5%, var(--paper-raised, #fff)); }
+.aichat__proposal-head { margin: 0; color: var(--by-ai, #5b4bc4); font-size: var(--fs-sm, 0.875rem); font-weight: var(--fw-medium, 500); }
+.aichat__tree { margin: 0; padding-left: 1.1rem; font-size: var(--fs-sm, 0.875rem); }
+.aichat__tree--root { padding-left: 0; list-style: none; max-height: 18rem; overflow: auto; }
+.aichat__tree li { margin: 1px 0; }
+.aichat__compose { display: grid; gap: 4px; padding-top: var(--sp-2, 8px); border-top: 1px solid var(--line, #e3e5ea); }
+.aichat__row-input { display: flex; align-items: flex-end; gap: var(--sp-2, 8px); }
+.aichat__row-input > .btn { flex: none; }
+.aichat__box { flex: 1 1 auto; min-width: 0; resize: none; min-height: 2.6rem; max-height: 200px; font: inherit; line-height: var(--lh-normal, 1.5); }
+@media (max-width: 759px) {
+  .aichat { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .aichat__side { max-height: 9.5rem; }
+  .aichat__kept { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Only a message that just came: a paint does not play the whole log again. */
+  .aichat__msg--new { animation: ai-rise 260ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both; }
+}
+
+/* The projects the chat may read from anywhere: one tick each, a short list
+   that scrolls when there are many. */
+.ai-projects { display: grid; gap: 2px; max-height: 12rem; overflow: auto; padding: 2px; }
+
+/* The chat, second round: a message's head (who, its versions, edit), the
+   pictures attached, the box that takes a drop, and the changes to a map. */
+.aichat__meta { display: flex; align-items: center; gap: 4px; }
+.aichat__msg--user .aichat__meta { justify-content: flex-end; }
+/* Under a message, as chatbots have it: the time, the versions, the actions.
+   Quiet until the message is pointed at (always there under a finger). */
+.aichat__foot { display: flex; align-items: center; gap: 2px; min-height: 28px; color: var(--ink-faint, #6b717c); font-size: var(--fs-xs, 0.75rem); }
+.aichat__msg--user .aichat__foot { justify-content: flex-end; }
+.aichat__time { margin: 0 6px 0 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aichat__msg--user .aichat__time { order: -1; }
+.aichat__act { width: 28px; height: 28px; min-width: 0; padding: 0; color: var(--ink-soft, #545a66); opacity: 0.55; transition: opacity 120ms var(--ease-out, ease-out); }
+.aichat__act .icon { width: 16px; height: 16px; }
+.aichat__msg:hover .aichat__act, .aichat__msg:focus-within .aichat__act, .aichat__msg:last-child .aichat__act { opacity: 1; }
+@media (hover: none) { .aichat__act { opacity: 1; } }
+.aichat__foot .aichat__versions .btn { width: 24px; height: 24px; min-width: 0; padding: 0; }
+.aichat__versions { display: inline-flex; align-items: center; gap: 0; color: var(--ink-soft, #545a66); font-size: var(--fs-xs, 0.75rem); font-variant-numeric: tabular-nums; }
+.aichat__version { min-width: 2.2em; text-align: center; }
+.aichat__box--edit { width: min(36rem, 100%); }
+.aichat__edit-actions { display: flex; justify-content: flex-end; gap: var(--sp-2, 8px); }
+.aichat__pics, .aichat__pending { display: flex; flex-wrap: wrap; gap: 6px; }
+.aichat__msg--user .aichat__pics { justify-content: flex-end; }
+.aichat__pic { display: block; width: 96px; height: 96px; object-fit: cover; border-radius: var(--r-control, 8px); border: 1px solid var(--line, #e3e5ea); background: var(--paper-sunken, #f3f4f6); }
+.aichat__pic--gone { visibility: hidden; }
+.aichat__pending-pic { position: relative; }
+.aichat__pending-pic .aichat__pic { width: 56px; height: 56px; }
+.aichat__pending-pic .btn { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; min-width: 0; padding: 0; border-radius: 999px; background: var(--paper-raised, #fff); box-shadow: var(--shadow-1, 0 1px 3px rgb(0 0 0 / 0.15)); }
+.aichat__compose--drop { outline: 2px dashed var(--by-ai, #5b4bc4); outline-offset: 4px; border-radius: var(--r-control, 8px); }
+.aichat__stats { margin: 0; font-size: var(--fs-sm, 0.875rem); color: var(--ink-soft, #545a66); font-variant-numeric: tabular-nums; }
+.aichat__plus { color: var(--success, #2f7d5a); font-weight: var(--fw-medium, 500); }
+.aichat__minus { color: var(--danger, #b3261e); font-weight: var(--fw-medium, 500); }
+.aichat__details summary { cursor: var(--mr-cursor, pointer); font-size: var(--fs-sm, 0.875rem); }
+.aichat__diff { max-height: 18rem; overflow: auto; margin-top: 6px; border: 1px solid var(--line, #e3e5ea); border-radius: var(--r-control, 8px); background: var(--paper, #fff); font: 12px/1.5 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.aichat__diff-line { display: flex; gap: 8px; padding: 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.aichat__diff-mark { flex: none; width: 1ch; color: var(--ink-faint, #6b717c); }
+.aichat__diff-line--in { background: color-mix(in srgb, var(--success, #2f7d5a) 12%, transparent); }
+.aichat__diff-line--out { background: color-mix(in srgb, var(--danger, #b3261e) 10%, transparent); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--danger, #b3261e) 50%, transparent); }
+.aichat__diff-gap { padding: 2px 8px; color: var(--ink-faint, #6b717c); font-style: italic; }
+.aichat__row-input > input[type=file] { display: none; }
+
+/* Tags: a map or a node of the project, as a small pill (above the box
+   before sending, in the message after). */
+.aichat__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.aichat__msg--user .aichat__tags { justify-content: flex-end; }
+.aichat__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 0 4px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--by-ai, #5b4bc4) 35%, transparent);
+  border-radius: var(--r-capsule, 999px);
+  background: color-mix(in srgb, var(--by-ai, #5b4bc4) 8%, var(--paper-raised, #fff));
+  font-size: var(--fs-xs, 0.75rem);
+  color: var(--ink, #15171c);
+}
+.aichat__tag:not(:has(.btn)) { padding-right: 8px; }
+.aichat__tag .icon { width: 14px; height: 14px; color: var(--by-ai, #5b4bc4); }
+.aichat__tag-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16rem; }
+.aichat__tag-map { color: var(--ink-faint, #6b717c); white-space: nowrap; }
+.aichat__tag-map::before { content: "· "; }
+.aichat__tag .btn { width: 20px; height: 20px; min-width: 0; padding: 0; }
+.aichat__at { min-width: 36px; padding: 0 8px; font-weight: var(--fw-medium, 500); font-size: 1.05rem; color: var(--ink-soft, #545a66); }
+
+/* The notice that tokens cost, on the person's own account: plain, always there. */
+.aichat__cost { color: var(--ink-faint, #6b717c); font-size: var(--fs-xs, 0.75rem); }
+
+/* Documents attached: a pill with the name and the size. */
+.aichat__docs { display: flex; flex-wrap: wrap; gap: 4px; }
+.aichat__msg--user .aichat__docs { justify-content: flex-end; }
+.aichat__doc { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 28px; padding: 0 6px 0 8px; border: 1px solid var(--line-strong, #c6cad2); border-radius: var(--r-control, 8px); background: var(--paper-raised, #fff); font-size: var(--fs-xs, 0.75rem); }
+.aichat__doc .icon { width: 16px; height: 16px; color: var(--ink-soft, #545a66); }
+.aichat__doc-name { min-width: 0; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aichat__doc-size { color: var(--ink-faint, #6b717c); white-space: nowrap; }
+.aichat__doc .btn { width: 20px; height: 20px; min-width: 0; padding: 0; }
+.aichat__pending { align-items: center; }
+.aichat__side-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2, 8px); margin-top: auto; }
+.aichat__side-foot .aichat__kept { margin: 0; }

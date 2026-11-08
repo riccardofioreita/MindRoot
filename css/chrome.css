@@ -1,0 +1,1418 @@
+/* MindRoot - chrome: the shell layout and every shared component.
+ *
+ * What lives here: the app grid (sidebar | main), the floating top capsules,
+ * the phone thumb bar, the sidebar column and drawer, buttons, the glass
+ * material, menus, popovers, tooltips, toasts, banners, dialogs, sheets,
+ * form fields, floating panels, the command palette, the drop overlay and
+ * the boot-failure screen. Motion for all of it is in motion.css.
+ *
+ * Material matrix (design brief, section 4). Glass is for the floating
+ * functional layer only, never on content, never glass on glass, at most
+ * four surfaces visible at once:
+ *   thin glass    small icon-only capsules (zoom)
+ *   regular glass top capsules, phone thumb bar, node toolbar, format bar
+ *   thick glass   menus and popovers with text rows
+ *   solid         sidebar, Markdown panel, viewer, dialogs (with scrim),
+ *                 sheet bodies, colour picker, panels; tooltips and toasts
+ *                 are the solid inverse.
+ * Menus opened from a glass bar are DOM siblings of it (in #layers), because
+ * a backdrop-filter nested in another only samples its parent.
+ *
+ * Class contract for other modules (stable names):
+ *   .btn .btn--icon .btn--text .btn--primary .btn--danger .btn--quiet
+ *   .capsule .glass .glass--thin .glass--thick
+ *   .menu .menu__item .menu__sep .menu__heading .menu__end .menu__kbd
+ *                                                       (built by ns.ui.menu)
+ *   .popover .tooltip .toast .banner .dialog .sheet    (built by ns.ui)
+ *   .sheet[data-detent="low"|"top"|"only"]              a bottom sheet's rest
+ *   .sheet[data-dragging] [data-settling]               under a finger, gliding
+ *   .field .field__label .field__hint .field__error .input .textarea .select
+ *   .check .switch .seg .seg__opt
+ *   .panel .panel__head .panel__title .panel__body .panel__foot .grip
+ *   .palette .palette__input .palette__list .palette__item .palette__group
+ *     .palette__meta .palette__empty  (item state: aria-selected="true")
+ *   .scroll-edge[data-scrolled] [data-more]            (ns.ui.scrollEdge)
+ *   .empty .empty__title .empty__text .empty__actions  (empty states)
+ * Toasts live in .toasts, a manual popover (top layer) inside #layers or
+ * inside the modal on top, so they show above its scrim and stay usable.
+ *
+ * Breakpoints: compact < 640, medium 640-1023, expanded >= 1024 (also in
+ * tokens.css and js/app.js LAYOUT). Hover styles only inside
+ * (hover: hover) and (pointer: fine), so a tap never leaves a button lit. */
+
+/* ================================================================ shell */
+
+#app {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-map);
+  display: grid;
+  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--paper);
+}
+
+#main {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  /* The stage takes what is left and never less than --stage-min; the
+     docked Markdown panel takes its own height up to the rest (its min-height
+     is 0 so the grid can shrink it), and on phones a third row keeps it
+     clear of the thumb bar. */
+  grid-template-rows: minmax(var(--stage-min), 1fr) auto var(--thumb-space, 0px);
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+#stage {
+  grid-row: 1;
+  grid-column: 1;
+  position: relative;
+  min-width: 0;
+  min-height: var(--stage-min);
+  overflow: hidden;
+  background: var(--paper);
+}
+
+/* No z-index here on purpose: the floaters (z-map-overlay) and the panels
+   (z-panel) inside it are layered against the top bar (z-chrome) in the one
+   stacking context #app makes, so a panel can be dragged over a capsule. */
+#floaters {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#floaters > * { pointer-events: auto; }
+
+#source {
+  grid-row: 2;
+  grid-column: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+
+#sidebar {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  z-index: var(--z-panel);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper-raised);
+  border-right: 1px solid var(--line);
+  padding: var(--safe-top) 0 var(--safe-bottom) var(--safe-left);
+  outline: none;
+}
+
+/* Expanded: a column beside the map, open unless it was closed by hand. */
+@media (min-width: 1024px) {
+  #app { grid-template-columns: calc(var(--sidebar-w) + var(--safe-left)) minmax(0, 1fr); }
+  html[data-sidebar="closed"] #app { grid-template-columns: 0 minmax(0, 1fr); }
+  html[data-sidebar="closed"] #sidebar { visibility: hidden; border-right: 0; }
+}
+
+/* Medium and compact: an overlay drawer, closed unless opened. No scrim:
+   the map stays visible and a tap on it closes the drawer (js/app.js). */
+@media (max-width: 1023px) {
+  #sidebar {
+    grid-area: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--drawer-w) + var(--safe-left));
+    border-radius: 0 var(--r-panel) var(--r-panel) 0;
+    translate: -100% 0;
+    visibility: hidden;
+  }
+  html[data-sidebar="open"] #sidebar {
+    translate: 0 0;
+    visibility: visible;
+    box-shadow: var(--shadow-md);
+  }
+  /* While a finger drags it, the drawer follows 1:1 (inline translate). The
+     list still scrolls vertically; a horizontal pull is the drawer's. */
+  html[data-sidebar-drag] #sidebar { visibility: visible; box-shadow: var(--shadow-md); }
+  #sidebar { touch-action: pan-y; }
+}
+
+/* The strip along the left edge that a finger swipes the drawer out of
+   (js/app.js). It lives in #stage, before #floaters, at the map's own
+   layer: above the map surface (inserted first), under everything later in
+   the stage (floaters, the viewer) and under the chrome; and, bounded by the
+   stage, it never reaches the docked Markdown panel below it. */
+.edge-swipe { display: none; }
+@media (max-width: 1023px) and (pointer: coarse) {
+  html:not([data-sidebar="open"]):not([data-mode="view"]) .edge-swipe {
+    display: block;
+    position: absolute;
+    z-index: var(--z-map);
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--edge-w) + var(--safe-left));
+    touch-action: none;
+  }
+}
+
+/* ---------------------------------------------------------------- top bar */
+
+#topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-chrome);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: max(var(--chrome-gap), var(--safe-top)) max(var(--chrome-gap), var(--safe-right)) 0 max(var(--chrome-gap), var(--safe-left));
+  pointer-events: none;
+}
+
+.topbar__slot {
+  display: flex;
+  min-width: 0;
+  pointer-events: auto;
+}
+.topbar__slot--lead { flex: 0 1 auto; }
+.topbar__slot--actions { flex: none; margin-left: auto; }
+.topbar__slot > * { min-width: 0; }
+
+.capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tap-gap);
+  min-width: 0;
+  min-height: var(--bar-h);
+  padding: var(--capsule-pad);
+  border-radius: var(--r-capsule);
+}
+
+/* Project / map. On glass, secondary ink falls to 3.7:1 over a saturated
+   branch, so the two halves are told apart by weight, not by grey. */
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.title__project {
+  min-width: 2.5em;
+  flex: 0 3 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--fw-medium);
+}
+.title__sep { flex: none; font-weight: var(--fw-medium); }
+.title__map {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--fw-semibold);
+}
+.title:not([data-has-map]) .title__sep,
+.title:not([data-has-map]) .title__map { display: none; }
+.title:not([data-has-map]) .title__project { font-weight: var(--fw-semibold); }
+
+/* Save state: a dot that says it without words, plus a short label where
+   there is room. The words for a screen reader live in a status element. */
+.save {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.save__dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--r-capsule);
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--line-control);
+}
+.save[data-state="idle"],
+.save:not([data-state]) { display: none; }
+.save[data-state="saving"] .save__dot { background: var(--line-control); box-shadow: none; }
+.save[data-state="saved"] .save__dot { background: var(--accent); box-shadow: none; }
+.save[data-state="failed"] .save__dot { background: var(--danger); box-shadow: none; }
+.save[data-state="memory"] .save__dot { box-shadow: inset 0 0 0 2px var(--danger); }
+.save__text { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1279px) {
+  .save__text { display: none; }
+  .save { padding: 0 var(--sp-2); }
+}
+
+/* ---------------------------------------------------------------- banners */
+
+#banners {
+  position: absolute;
+  z-index: var(--z-chrome);
+  top: calc(max(var(--chrome-gap), var(--safe-top)) + var(--bar-h) + var(--sp-2));
+  left: max(var(--chrome-gap), var(--safe-left));
+  right: max(var(--chrome-gap), var(--safe-right));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  pointer-events: none;
+}
+#banners:empty { display: none; }
+
+.banner {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  width: fit-content;
+  max-width: min(var(--banner-w), 100%);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  background: var(--paper-raised);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-popover);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-snug);
+}
+.banner > .icon { color: var(--ink-soft); }
+.banner--warn,
+.banner--error { border-color: var(--danger); }
+.banner--warn > .icon,
+.banner--error > .icon { color: var(--danger); }
+.banner__text {
+  flex: 1 1 calc(var(--banner-w) / 3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding-block: var(--sp-1);
+}
+.banner__actions {
+  display: flex;
+  flex: none;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------- thumb bar */
+
+#thumbbar { display: none; }
+
+@media (max-width: 639px) {
+  #thumbbar {
+    position: absolute;
+    z-index: var(--z-chrome);
+    left: 0;
+    right: 0;
+    bottom: var(--dock-bottom);
+    width: fit-content;
+    max-width: calc(100% - 2 * var(--chrome-gap));
+    margin-inline: auto;
+    display: flex;
+    justify-content: center;
+    gap: var(--tap-gap);
+  }
+  #thumbbar[hidden] { display: none; }
+  #thumbbar .btn--icon { width: calc(var(--control-h) + var(--sp-1)); }
+
+  /* Only the lead capsule (menu, title, save dot) on top; the actions moved
+     down to the thumb. */
+  .topbar__slot--actions { display: none; }
+  .topbar__slot--lead { flex: 0 1 auto; max-width: 100%; }
+  .topbar__slot--lead > .capsule { flex: 0 1 auto; max-width: 100%; }
+  .title[data-has-map] .title__project,
+  .title[data-has-map] .title__sep { display: none; }
+
+  /* A docked Markdown panel ends above the thumb bar instead of under it. */
+  html[data-source="open"] #main { --thumb-space: calc(var(--bar-h) + var(--dock-bottom)); }
+  html[data-mode="view"] #main { --thumb-space: 0px; }
+}
+
+/* Landscape phones: a bar is a large share of 360px of height. */
+/* A phone on its side, or a tablet with its keyboard up, is short but
+   still a finger: targets keep their 44 px (pointer: coarse), and the map's
+   name stays in the top bar, where there is width for it. */
+
+/* ---------------------------------------------------------------- zoom capsule */
+
+/* Thin glass over the stage's bottom-right corner. A grid item in the stage's
+   own cell, so it follows the stage when the Markdown panel docks under it. */
+#zoombar {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: end;
+  justify-self: end;
+  position: relative;
+  z-index: var(--z-chrome);
+  margin: 0 max(var(--chrome-gap), var(--safe-right)) calc(var(--chrome-gap) + var(--zoom-safe, var(--safe-bottom))) 0;
+}
+html[data-source="open"] #zoombar { --zoom-safe: 0px; }
+@media (max-width: 639px) {
+  #zoombar { display: none; }
+}
+html[data-mode="view"] #zoombar { display: none; }
+
+/* ---------------------------------------------------------------- view only */
+
+html[data-mode="view"] #topbar,
+html[data-mode="view"] #thumbbar,
+html[data-mode="view"] #sidebar,
+html[data-mode="view"] #source,
+html[data-mode="view"] #banners { display: none; }
+html[data-mode="view"] #app { grid-template-columns: 0 minmax(0, 1fr); }
+
+/* Two classes: .btn sets position: relative later in this file. */
+.btn.view-exit {
+  position: fixed;
+  z-index: var(--z-chrome);
+  top: max(var(--chrome-gap), var(--safe-top));
+  right: max(var(--chrome-gap), var(--safe-right));
+  border-radius: var(--r-capsule);
+  opacity: 0.72;
+}
+.btn.view-exit:focus-visible { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .btn.view-exit:hover { opacity: 1; }
+}
+
+/* ================================================================ buttons */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+  min-width: 0;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.btn--icon {
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  flex: none;
+}
+/* A 32px icon button on a mouse still gets a 36px target. */
+.btn--icon::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+}
+
+.btn--text { background: var(--paper-sunken); }
+.btn--primary { background: var(--accent); color: var(--on-accent); }
+.btn--danger { background: var(--danger); color: var(--on-danger); }
+.btn--quiet { color: var(--accent-ink); }
+.btn--quiet.btn--destructive,
+.btn--destructive { color: var(--danger); }
+
+.capsule .btn { border-radius: var(--r-capsule); }
+
+/* Toggled on: a solid accent pill (accent icons on glass would be 2.7:1). */
+.btn[aria-pressed="true"],
+.btn[aria-expanded="true"].btn--toggle {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  color: var(--ink-disabled);
+}
+.btn--primary:disabled,
+.btn--primary[aria-disabled="true"],
+.btn--danger:disabled,
+.btn--danger[aria-disabled="true"] {
+  background: var(--paper-sunken);
+  color: var(--ink-disabled);
+}
+
+/* The kind rules repeat every :not() of the generic rule so they are at
+   least as specific and, coming later, win: a primary button must stay
+   green under the pointer, never turn into white text on the hover grey. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]) { background-color: var(--hover); }
+  .btn--text:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]) { background-color: var(--line); }
+  .btn--primary:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]) { background-color: var(--accent); filter: brightness(1.08); }
+  .btn--danger:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]) { background-color: var(--danger); filter: brightness(1.08); }
+}
+.btn:active:not(:disabled):not([aria-disabled="true"]),
+.btn[data-pressed] { background-color: var(--pressed); }
+.btn--primary:active:not(:disabled):not([aria-disabled="true"]),
+.btn--primary[data-pressed],
+.btn[aria-pressed="true"]:active:not(:disabled):not([aria-disabled="true"]) { background-color: var(--accent); }
+.btn--danger:active:not(:disabled):not([aria-disabled="true"]),
+.btn--danger[data-pressed] { background-color: var(--danger); }
+
+/* A badge on a button (a count). */
+.btn__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: var(--badge);
+  height: var(--badge);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-capsule);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-badge);
+  font-weight: var(--fw-semibold);
+  line-height: var(--badge);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ================================================================ glass */
+
+.glass {
+  --g-tint: var(--glass-regular);
+  --g-blur: var(--glass-blur-regular);
+  background: var(--g-tint);
+  -webkit-backdrop-filter: blur(var(--g-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--g-blur)) saturate(var(--glass-sat));
+  box-shadow: inset 0 0 0 0.5px var(--glass-rim), inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+  color: var(--ink);
+  letter-spacing: var(--tr-glass);
+}
+.glass--thin { --g-tint: var(--glass-thin); --g-blur: var(--glass-blur-thin); }
+.glass--thick { --g-tint: var(--glass-thick); --g-blur: var(--glass-blur-thick); }
+
+/* A focus ring over a busy map needs a halo to be seen. */
+.glass :focus-visible { box-shadow: var(--focus-halo); }
+
+/* Fallbacks are not optional: same radius and size, so nothing moves when
+   one of them switches on. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--paper-raised); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-transparency]) .glass {
+    background: var(--paper-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+:root[data-transparency="reduce"] .glass {
+  background: var(--paper-raised);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (prefers-contrast: more) {
+  .glass {
+    background: var(--paper-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px var(--line-control), var(--shadow-sm);
+  }
+}
+
+/* The optional refraction (vendor/liquid-glass, see ns.glass in ui.js) brings
+   its own blur, so the capsule under it drops its backdrop-filter (glass on
+   glass would sample the wrong layer) and keeps only a lighter tint, which is
+   what keeps the text legible. The library's inline black shadow and forced
+   white text are overridden here, its transition: all in motion.css. */
+.glass.is-liquid {
+  background: var(--glass-liquid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.lg-root { max-width: 100%; }
+/* Wrapped in the library's block layers, an inline-flex capsule would size
+   to its full title (a nowrap title has a huge min-content) instead of
+   shrinking with the bar: as a block-level flex box it fills, and is
+   limited by, the slot like it is without the library. */
+.lg-content > .capsule { display: flex; max-width: 100%; }
+.lg-glass { box-shadow: var(--glass-shadow) !important; }
+.lg-content {
+  color: inherit !important;
+  font: inherit !important;
+  text-shadow: none !important;
+  min-width: 0;
+}
+
+/* ================================================================ menus */
+
+.menu {
+  position: fixed;
+  z-index: var(--z-popover);
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: var(--menu-min-w);
+  max-width: var(--menu-max-w);
+  max-height: var(--avail-h, var(--avail-fallback));
+  padding: var(--sp-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--r-popover);
+  font-size: var(--fs-ui);
+  outline: none;
+}
+.menu:not(.glass) {
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-md);
+}
+
+.menu__item {
+  display: grid;
+  grid-template-columns: var(--icon) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--row-h);
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  border-radius: calc(var(--r-popover) - var(--sp-1));
+  color: var(--ink);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-snug);
+  text-align: start;
+}
+.menu__item > .icon { grid-column: 1; }
+.menu__label {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu__end {
+  grid-column: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.menu__kbd {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.menu__check { color: var(--accent-ink); }
+/* A phone has no keyboard to press them on: the hints would only crowd the
+   rows (a tablet keeps them; it may well have one). */
+@media (max-width: 639px) and (pointer: coarse) {
+  .menu__kbd { display: none; }
+}
+.menu__item:focus,
+.menu__item[data-active] { background: var(--hover); }
+/* A sheet opened by a finger focuses its list for the keyboard that may
+   follow; no row should look pressed before it is touched. */
+.menu--sheet .menu__item:focus:not(:focus-visible):not([data-active]) { background: transparent; }
+.menu__item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+.menu__item--danger { color: var(--danger); }
+.menu__item--danger .menu__kbd { color: var(--danger); }
+.menu__item[aria-disabled="true"] { color: var(--ink-disabled); }
+.menu__item[aria-disabled="true"] .menu__kbd { color: var(--ink-disabled); }
+.menu__item[aria-checked="false"] .icon--check { visibility: hidden; }
+
+.menu__sep {
+  flex: none;
+  height: 1px;
+  margin: var(--sp-1) var(--sp-2);
+  background: var(--line);
+}
+.menu__heading {
+  flex: none;
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-soft);
+  letter-spacing: var(--tr-small);
+}
+
+/* A menu presented as a bottom sheet on a phone: rows at full width, on
+   the sheet's own surface. */
+.menu.menu--sheet {
+  position: static;
+  max-width: none;
+  min-width: 0;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ================================================================ popover, tooltip */
+
+.popover {
+  position: fixed;
+  z-index: var(--z-popover);
+  top: 0;
+  left: 0;
+  max-width: calc(100vw - 2 * var(--sp-2));
+  max-height: var(--avail-h, var(--avail-fallback));
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--paper-raised);
+  color: var(--ink);
+  border-radius: var(--r-popover);
+  box-shadow: var(--shadow-md);
+}
+.popover.glass { background: var(--g-tint); }
+
+.tooltip {
+  position: fixed;
+  z-index: var(--z-tooltip);
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: var(--tooltip-max-w);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-chip);
+  background: var(--inverse);
+  color: var(--on-inverse);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-snug);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.tooltip .kbd {
+  background: transparent;
+  color: var(--inverse-soft);
+  border-color: var(--inverse-soft);
+}
+
+/* ================================================================ toasts */
+
+/* The region is a manual popover where the engine has them (ui.js): every
+   property the browser's popover box sets is set again here, so it is the
+   same strip along the bottom with or without the top layer. */
+.toasts {
+  position: fixed;
+  z-index: var(--z-toast);
+  /* --toast-left/right/bottom: the free part of the map (ui.placeToasts);
+     without them, the strip along the window's foot. */
+  inset: auto var(--toast-right, 0px) var(--toast-bottom, calc(var(--dock-bottom) + var(--toast-lift, 0px))) var(--toast-left, 0px);
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 max(var(--chrome-gap), var(--safe-right)) 0 max(var(--chrome-gap), var(--safe-left));
+  pointer-events: none;
+}
+@media (max-width: 639px) {
+  /* Above the thumb bar, which sits in the same spot. */
+  html:not([data-mode="view"]) .toasts { --toast-lift: calc(var(--bar-h) + var(--sp-2)); }
+}
+/* Over an open bottom sheet the strip along the bottom would lie on the
+   sheet's own rows and actions, and a toast said while it is open ("Picture
+   added", "Copy taken") would take the tap meant for the row under it. There
+   toasts come in at the top, over the scrim the sheet leaves free at its
+   highest rest. */
+.sheet[data-place="bottom"] > .toasts {
+  inset: calc(var(--safe-top) + var(--sp-2)) 0 auto 0;
+}
+/* On a phone the drawing viewer's tools run along the bottom, right where
+   toasts appear above the thumb bar: while it is open (media.js sets
+   data-viewer), toasts come in under the top bar instead, over the map. */
+@media (max-width: 639px) {
+  html[data-viewer] #layers > .toasts {
+    inset: calc(max(var(--chrome-gap), var(--safe-top)) + var(--bar-h) + var(--sp-2)) 0 auto 0;
+  }
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: fit-content;
+  max-width: var(--toast-w);
+  min-height: var(--control-h);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-4);
+  border-radius: var(--r-popover);
+  background: var(--inverse);
+  color: var(--on-inverse);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-snug);
+  /* The flick away is the toast's own (ui.js): with a pan allowed, the
+     browser would take the gesture and cancel the pointer. */
+  touch-action: none;
+}
+.toast > .icon { color: var(--inverse-accent); margin-left: calc(-1 * var(--sp-1)); }
+.toast[data-kind="error"] > .icon { color: var(--on-inverse); }
+.toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--sp-2) 0;
+  overflow-wrap: anywhere;
+}
+/* A toast with no button after its words: the right edge gets the same
+   room as the left, or the last letter touches the pill's border. */
+.toast__text:last-child { padding-right: var(--sp-3); }
+.toast .btn { color: var(--on-inverse); }
+/* The action keeps its whole word; the message wraps instead. */
+.toast .toast__action {
+  flex: none;
+  background: transparent;
+  color: var(--inverse-accent);
+  font-weight: var(--fw-semibold);
+  padding: 0 var(--sp-3);
+}
+.toast .toast__close { flex: none; color: var(--inverse-soft); }
+.toast .btn:active,
+.toast .btn[data-pressed] { background-color: var(--inverse-soft); }
+@media (hover: hover) and (pointer: fine) {
+  .toast .btn:hover:not(:disabled) { background-color: var(--inverse-hover); }
+}
+.toast .btn:focus-visible { outline-color: var(--inverse-accent); }
+
+/* ================================================================ dialogs */
+
+dialog {
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  max-width: none;
+  max-height: none;
+}
+/* A dialog or sheet takes focus itself only to hand it on (screen readers
+   announce it); it is not a control, so it draws no ring. */
+dialog:focus-visible { outline: none; }
+
+/* Centred in what can be seen: above an on-screen keyboard (iOS keeps the
+   layout viewport full height under it) and below the part of the page it
+   has panned away (--vv-top), both written by js/app.js. */
+.dialog {
+  inset-block: var(--vv-top) var(--kb);
+  width: var(--dialog-w);
+  max-height: calc(100% - 2 * var(--sp-4) - var(--kb) - var(--vv-top));
+  margin: auto;
+  overflow: hidden;
+  background: var(--paper-raised);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-md);
+}
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.dialog::backdrop { background: var(--scrim); }
+
+.dialog__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-5) var(--sp-3) var(--sp-2) var(--sp-5);
+}
+.dialog__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: var(--sp-1);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-title);
+  line-height: var(--lh-tight);
+  overflow-wrap: anywhere;
+}
+.dialog__head .btn--icon { margin-top: calc(-1 * var(--sp-2)); }
+.dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-2) var(--sp-5) var(--sp-4);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+.dialog__body > * + * { margin-top: var(--sp-3); }
+.dialog__text {
+  max-width: 65ch;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.dialog__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-5) var(--sp-5);
+}
+.dialog__foot .btn--start { margin-right: auto; }
+
+@media (max-width: 639px) {
+  .dialog__head { padding: var(--sp-4) var(--sp-2) var(--sp-2) var(--sp-4); }
+  .dialog__body { padding: var(--sp-2) var(--sp-4) var(--sp-4); }
+  /* Stacked full width; given [cancel, ok] the primary ends at the bottom,
+     nearest the thumb. */
+  .dialog__foot { flex-direction: column; align-items: stretch; padding: var(--sp-2) var(--sp-4) calc(var(--sp-4) + var(--safe-bottom)); }
+  .dialog__foot .btn { width: 100%; }
+  .dialog__foot .btn--start { margin-right: 0; }
+}
+
+/* ================================================================ sheets */
+
+.sheet {
+  overflow: hidden;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-md);
+}
+.sheet[open] {
+  display: flex;
+  flex-direction: column;
+}
+.sheet[data-modal]::backdrop { background: var(--scrim); }
+.sheet:not([data-modal])::backdrop { background: transparent; }
+
+/* Sized to where it rests (ui.js sets the height of a sheet with several
+   rests): what it holds at the bottom stays on screen at every rest. At
+   rest it is at most --sheet-top of the height above the keyboard; while a
+   finger stretches it, up to the safe area. The home-bar inset is padding
+   only while no keyboard covers the home bar. */
+.sheet[data-place="bottom"] {
+  position: fixed;
+  top: auto;
+  bottom: var(--kb);
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: var(--sheet-bottom-w);
+  max-height: calc((100% - var(--kb)) * var(--sheet-top));
+  margin: 0 auto;
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  padding: 0 var(--safe-right) max(0px, calc(var(--safe-bottom) - var(--kb))) var(--safe-left);
+}
+.sheet[data-place="bottom"][data-dragging],
+.sheet[data-place="bottom"][data-settling] { max-height: calc(100% - var(--kb) - var(--safe-top)); }
+/* Below its highest rest, a swipe on the body moves the sheet (the body
+   scrolls only at the top rest); a mouse wheel still scrolls it. */
+.sheet[data-detent="low"] .sheet__body { touch-action: none; }
+
+.sheet[data-place="center"] {
+  inset-block: var(--vv-top) var(--kb);
+  width: min(var(--sheet-w), calc(100% - 2 * var(--sp-4)));
+  max-height: min(var(--sheet-h), calc(100% - 2 * var(--sp-6) - var(--kb) - var(--vv-top)));
+  margin: auto;
+  border-radius: var(--r-panel);
+}
+
+.sheet[data-place="side"] {
+  position: fixed;
+  top: max(var(--chrome-gap), var(--safe-top));
+  right: max(var(--chrome-gap), var(--safe-right));
+  bottom: var(--dock-bottom);
+  left: auto;
+  width: min(var(--side-w), calc(100% - 2 * var(--chrome-gap)));
+  height: auto;
+  margin: 0;
+  border-radius: var(--r-panel);
+}
+
+.sheet__grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: var(--sp-5);
+  margin-bottom: calc(-1 * var(--sp-2));
+  cursor: grab;
+  touch-action: none;
+}
+.sheet__grip::before {
+  content: "";
+  width: var(--grip-w);
+  height: var(--grip-h);
+  border-radius: var(--r-capsule);
+  background: var(--line-strong);
+}
+.sheet:not([data-place="bottom"]) .sheet__grip { display: none; }
+
+.sheet__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: calc(var(--control-h) + var(--sp-4));
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+}
+.sheet[data-place="bottom"] .sheet__head { touch-action: none; }
+.sheet__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-title);
+  line-height: var(--lh-tight);
+  overflow-wrap: anywhere;
+}
+.sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--sp-4) var(--sp-4);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+.sheet__foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.sheet--menu .sheet__body { padding: 0 var(--sp-2) var(--sp-3); }
+.sheet--menu .sheet__head { min-height: var(--control-h); }
+.sheet[data-dragging] { user-select: none; }
+
+/* ================================================================ fields */
+
+.field { display: grid; gap: var(--sp-1); }
+.field__label {
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  color: var(--ink);
+}
+/* A hint runs the width of its field, like the field above it ('pretty'
+   wrapping would end its first line well short of the field's edge). */
+.field__hint { font-size: var(--fs-xs); color: var(--ink-soft); line-height: var(--lh-snug); text-wrap: wrap; }
+.field__error { font-size: var(--fs-xs); color: var(--danger); line-height: var(--lh-snug); }
+.field__error:empty { display: none; }
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0 var(--sp-3);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-control);
+  border-radius: var(--r-control);
+  font-size: var(--fs-input);
+  line-height: var(--lh-snug);
+}
+.textarea {
+  min-height: var(--textarea-min);
+  padding: var(--sp-2) var(--sp-3);
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+  outline: none;
+}
+.input[aria-invalid="true"],
+.textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px var(--danger);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--row-h);
+  font-size: var(--fs-ui);
+  cursor: var(--mr-cursor, pointer);
+}
+.check input,
+input[type="checkbox"],
+input[type="radio"] {
+  width: var(--check);
+  height: var(--check);
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+input[type="range"] { accent-color: var(--accent); }
+
+/* A switch is a <button role="switch" aria-checked>. */
+.switch {
+  position: relative;
+  flex: none;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  border-radius: var(--r-capsule);
+  background: var(--paper-sunken);
+  box-shadow: inset 0 0 0 1px var(--line-control);
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  top: var(--switch-pad);
+  left: var(--switch-pad);
+  width: calc(var(--switch-h) - 2 * var(--switch-pad));
+  height: calc(var(--switch-h) - 2 * var(--switch-pad));
+  border-radius: var(--r-capsule);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line-control);
+}
+.switch[aria-checked="true"] { background: var(--accent); box-shadow: none; }
+.switch[aria-checked="true"]::before { translate: calc(var(--switch-w) - var(--switch-h)) 0; box-shadow: var(--shadow-sm); }
+/* The visible switch is small; its target is not. */
+.switch::after { content: ""; position: absolute; inset: calc((var(--switch-h) - var(--row-h)) / 2) calc(-1 * var(--sp-1)); }
+
+/* A segmented control is a radiogroup of .seg__opt buttons. */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--paper-sunken);
+  border-radius: var(--r-control);
+}
+.seg__opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: calc(var(--control-h) - 2 * 2px);
+  padding: 0 var(--sp-3);
+  border-radius: calc(var(--r-control) - 2px);
+  color: var(--ink);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+.seg__opt[aria-checked="true"] {
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sm);
+}
+/* A finger's option is a whole control high (the track grows by its own
+   inset), not the 40 px left inside a 44 px track. */
+@media (pointer: coarse) {
+  .seg__opt { min-height: var(--control-h); }
+}
+@media (hover: hover) and (pointer: fine) {
+  .seg__opt:hover:not([aria-checked="true"]) { background: var(--hover); }
+}
+
+/* ================================================================ panels */
+
+.panel {
+  position: absolute;
+  z-index: var(--z-panel);
+  top: calc(max(var(--chrome-gap), var(--safe-top)) + var(--bar-h) + var(--sp-2));
+  left: max(var(--chrome-gap), var(--safe-left));
+  width: var(--panel-w);
+  max-height: calc(100% - var(--bar-h) - 3 * var(--chrome-gap));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper-raised);
+  color: var(--ink);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-md);
+}
+.panel[data-moving] { box-shadow: var(--shadow-lift); }
+.panel__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: calc(var(--control-h) + var(--sp-2));
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) 0;
+}
+.panel__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+.panel__foot {
+  flex: none;
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+
+/* The six-dot handle every floating panel is carried by (ns.float). */
+.grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  color: var(--ink-faint);
+  cursor: grab;
+  touch-action: none;
+}
+.grip:active,
+[data-moving] .grip { cursor: grabbing; }
+
+/* ================================================================ palette */
+
+.palette {
+  inset-block: var(--vv-top) var(--kb);
+  width: min(var(--palette-w), calc(100% - 2 * var(--sp-4)));
+  max-height: min(var(--palette-h), calc(100% - 2 * var(--sp-7) - var(--kb) - var(--vv-top)));
+  margin: var(--palette-top) auto auto;
+  overflow: hidden;
+  background: var(--paper-raised);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-lift);
+}
+.palette[open] { display: flex; flex-direction: column; }
+.palette::backdrop { background: var(--scrim); }
+.palette__input {
+  flex: none;
+  width: 100%;
+  min-height: var(--field-lg);
+  padding: 0 var(--sp-4);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: max(var(--fs-md), var(--fs-input));
+}
+.palette__input:focus { outline: none; }
+.palette__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1);
+}
+.palette__group {
+  padding: var(--sp-2) var(--sp-3) var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-soft);
+}
+.palette__item {
+  display: grid;
+  grid-template-columns: var(--icon) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-3);
+  min-height: var(--row-h);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-control);
+  color: var(--ink);
+  cursor: var(--mr-cursor, pointer);
+}
+.palette__item[aria-selected="true"] { background: var(--accent-soft); }
+.palette__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette__meta { font-size: var(--fs-xs); color: var(--ink-soft); white-space: nowrap; }
+.palette__empty { padding: var(--sp-4); color: var(--ink-soft); overflow-wrap: anywhere; }
+.palette mark,
+mark.hit {
+  background: var(--accent-soft);
+  color: inherit;
+  border-radius: 2px;
+}
+@media (max-width: 639px) {
+  .palette { margin-top: max(var(--chrome-gap), var(--safe-top)); max-height: calc(100% - 2 * var(--chrome-gap) - var(--kb) - var(--vv-top)); }
+}
+
+/* ================================================================ empty states */
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  max-width: var(--empty-w);
+  margin: auto;
+  padding: var(--sp-5);
+  text-align: center;
+}
+.empty__title {
+  font-family: var(--font-brand);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-display);
+  letter-spacing: var(--tr-display);
+  line-height: var(--lh-tight);
+  text-wrap: balance;
+}
+.empty__text { color: var(--ink-soft); font-size: var(--fs-md); line-height: var(--lh-body); text-wrap: pretty; }
+.empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); }
+
+/* ================================================================ scroll edge */
+
+/* The content fades out under a floating header or bar instead of being cut
+   by a hairline, and only once it has scrolled. Gradients only: a url() mask
+   can be CORS-blocked on file://. */
+.scroll-edge[data-scrolled] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade));
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade));
+}
+.scroll-edge[data-more] {
+  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 var(--fade));
+  mask-image: linear-gradient(to top, transparent 0, #000 var(--fade));
+}
+.scroll-edge[data-scrolled][data-more] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade), #000 calc(100% - var(--fade)), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade), #000 calc(100% - var(--fade)), transparent 100%);
+}
+
+/* ================================================================ drop overlay */
+
+#drop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-drag);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: var(--accent-soft);
+  outline: 2px dashed var(--accent);
+  outline-offset: calc(-1 * var(--chrome-gap));
+}
+.drop__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5);
+  border-radius: var(--r-capsule);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+
+/* ================================================================ boot failure */
+
+.boot-fail {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: max(var(--sp-5), var(--safe-top)) max(var(--sp-4), var(--safe-right)) max(var(--sp-5), var(--safe-bottom)) max(var(--sp-4), var(--safe-left));
+  background: var(--paper);
+  color: var(--ink);
+}
+.boot-fail__card {
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: var(--card-w);
+}
+.boot-fail__title {
+  font-family: var(--font-brand);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-display);
+  letter-spacing: var(--tr-display);
+}
+.boot-fail__text { color: var(--ink-soft); font-size: var(--fs-md); line-height: var(--lh-body); }
+.boot-fail__error {
+  max-height: var(--error-h);
+  overflow: auto;
+  margin: 0;
+  padding: var(--sp-3);
+  background: var(--paper-sunken);
+  border-radius: var(--r-control);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.boot-fail__actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.boot-fail__status { font-size: var(--fs-ui); color: var(--ink-soft); }
+
+/* ================================================================ forced colours */
+
+/* Windows high contrast strips backgrounds and shadows: borders take over,
+   or every floating edge vanishes. */
+@media (forced-colors: active) {
+  .glass,
+  .menu,
+  .popover,
+  .toast,
+  .tooltip,
+  .dialog,
+  .sheet,
+  .banner,
+  .panel,
+  .palette,
+  #thumbbar {
+    border: 1px solid CanvasText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass { background: Canvas; }
+  .btn[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .menu__item:focus,
+  .palette__item[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .save__dot { forced-color-adjust: none; }
+  #sidebar { border-right: 1px solid CanvasText; }
+  /* Switches and segments are drawn with backgrounds, which forced colours
+     flatten to Canvas: the track gets a border, the thumb the text colour,
+     and what is on (or chosen) the Highlight. */
+  .switch { border: 1px solid CanvasText; }
+  .switch::before { background: CanvasText; box-shadow: none; }
+  .switch[aria-checked="true"] { background: Highlight; border-color: Highlight; }
+  .switch[aria-checked="true"]::before { background: HighlightText; }
+  .seg__opt { border: 1px solid transparent; }
+  .seg__opt[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; border-color: Highlight; }
+  .seg__opt[aria-checked="true"] * { background: transparent; color: inherit; }
+  /* A control that cannot act now says so the way the system does. */
+  .btn[aria-disabled="true"],
+  .btn:disabled { color: GrayText; }
+}
+
+@media print {
+  #topbar, #thumbbar, #sidebar, #source, #banners, #layers, #drop, .view-exit { display: none !important; }
+}

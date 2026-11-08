@@ -1,0 +1,550 @@
+/* MindRoot - the picture viewer, the drop target on the map and the media
+ * panel (js/features/media.js).
+ *
+ * The viewer is a section of #main. Where it stands is written on <html> by
+ * the script (data-viewer = split | full | card, data-viewer-side = right |
+ * bottom) with the seam's share of the main area in --viewer-frac on #main.
+ * Split makes the viewer a track of #main's grid, so the stage really
+ * shrinks (the map re-measures by itself and keeps the selected node in
+ * sight); this reaches into the shell's #main, #source, #topbar, #banners and
+ * #thumbbar on purpose, and only while the viewer is open. Full lays it over
+ * every track of #main. The card floats inside #main at a place the script
+ * writes (left/top/width/height, clamped there) and never past the screen.
+ *
+ * Inside: a bar (title, the photo's zoom, the three places, close), the
+ * body (a photo that pans and zooms, or a node's notebook - css/notebook.css
+ * and css/ink.css bring its own chrome - filling .viewer__ink), the seam on
+ * the edge facing the map, the card's corner grip. The map's board is not
+ * shown here: it is the Board view on the stage (notebook.js).
+ * Motion: an opacity rise in, nothing that moves the map; the photo glides
+ * only on button and double-tap zooms. Durations are the motion tokens. */
+
+#viewer {
+  /* Component sizes, in one place. */
+  --viewer-seam: var(--sp-2);
+  --viewer-seam-touch: var(--sp-4);
+  --viewer-grip: var(--sp-5);
+  --viewer-pad: var(--sp-4);
+
+  position: relative;
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--paper-raised);
+  color: var(--ink);
+  outline: none;
+}
+#viewer[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- split: beside the map */
+
+html[data-viewer="split"][data-viewer-side="right"] #main {
+  grid-template-columns: minmax(0, 1fr) calc(var(--viewer-frac, 0.42) * 100%);
+}
+html[data-viewer="split"][data-viewer-side="right"] #viewer {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  border-left: 1px solid var(--line-strong);
+  padding-top: var(--safe-top);
+  padding-right: var(--safe-right);
+}
+/* The floating chrome of the map stays over the map. */
+html[data-viewer="split"][data-viewer-side="right"] #topbar,
+html[data-viewer="split"][data-viewer-side="right"] #banners {
+  right: calc(var(--viewer-frac, 0.42) * 100%);
+}
+
+/* ---------------------------------------------------------------- split: under the map */
+
+/* The viewer's row is the one that gives way (down to nothing but its
+   share) when the stage's minimum and a docked Markdown panel need the
+   room: stage + viewer + panel always fit inside #main. */
+html[data-viewer="split"][data-viewer-side="bottom"] #main {
+  grid-template-rows: minmax(var(--stage-min), 1fr) minmax(0, calc(var(--viewer-frac, 0.42) * 100%)) auto var(--thumb-space, 0px);
+}
+html[data-viewer="split"][data-viewer-side="bottom"] #viewer {
+  grid-column: 1;
+  grid-row: 2;
+  border-top: 1px solid var(--line-strong);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+/* From 640 px up the docked Markdown panel keeps its row, under the
+   viewer. On phones it covers every row of #main (source.css) and is left
+   alone: see the phone block below. */
+@media (min-width: 640px) {
+  html[data-viewer="split"][data-viewer-side="bottom"] #source { grid-row: 3; }
+}
+
+/* ---------------------------------------------------------------- full */
+
+html[data-viewer="full"] #viewer {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+/* ---------------------------------------------------------------- card */
+
+html[data-viewer="card"] #viewer {
+  position: absolute;
+  max-width: calc(100vw - 2 * var(--sp-2));
+  max-height: calc(100vh - 2 * var(--sp-2));
+  max-height: calc(100dvh - 2 * var(--sp-2));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Phones: the thumb bar keeps its row under a viewer that shares the
+   screen with the map, and steps aside for one that covers it. */
+@media (max-width: 639px) {
+  html[data-viewer="split"] #main,
+  html[data-viewer="card"] #main { --thumb-space: calc(var(--bar-h) + var(--dock-bottom)); }
+  html[data-mode="view"][data-viewer] #main { --thumb-space: 0px; }
+  html[data-viewer="full"] #thumbbar { display: none; }
+  /* A drawing: its own tool row and undo stand where the thumb bar would,
+     and the map's buttons under it would act on the map behind it. */
+  html[data-viewer-kind="draw"] #thumbbar { display: none; }
+  html[data-viewer-kind="draw"] #main { --thumb-space: 0px; }
+
+  /* The Markdown panel covers the whole main area on a phone; a viewer
+     sharing the screen with it would cut it in two (the panel above, the
+     viewer over its chip row). One layer at a time: the viewer opened last
+     covers the panel the way full does, and closing it gives the panel
+     back as it was. */
+  html[data-source="open"][data-viewer="split"] #viewer {
+    grid-row: 1 / -1;
+    grid-column: 1 / -1;
+    position: absolute;
+    inset: 0 0 var(--thumb-space, 0px) 0;
+    z-index: calc(var(--z-panel) + 1);
+    padding-top: var(--safe-top);
+    border-top: 0;
+  }
+  html[data-source="open"][data-viewer="split"] #main {
+    grid-template-rows: minmax(var(--stage-min), 1fr) auto var(--thumb-space, 0px);
+  }
+  html[data-source="open"][data-viewer="split"] .viewer__seam { display: none; }
+}
+
+/* ---------------------------------------------------------------- the bar */
+
+.viewer__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--tap-gap);
+  min-height: var(--bar-h);
+  padding: var(--capsule-pad) var(--capsule-pad) var(--capsule-pad) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-raised);
+}
+.viewer__bar[data-handle] {
+  cursor: grab;
+  touch-action: none;
+}
+html[data-viewer-resizing] .viewer__bar[data-handle] { cursor: grabbing; }
+
+.viewer__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-small);
+  color: var(--ink);
+}
+
+.viewer__tools,
+.viewer__modes {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--tap-gap);
+}
+.viewer__tools[hidden] { display: none; }
+.viewer__modes {
+  padding-left: var(--sp-1);
+  border-left: 1px solid var(--line);
+}
+.viewer__modes .btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.viewer__close { flex: none; }
+/* Delete: says so in words where there is room, in the colour of things
+   that go to the trash; a narrow bar keeps its icon (the name stays in its
+   aria-label and tooltip). */
+.viewer__trash { flex: none; color: var(--danger); }
+.viewer__trash[hidden] { display: none; }
+
+/* A narrow viewer keeps its title readable: the zoom and the places fold
+   into one menu button. Finger-sized buttons need more room before that. */
+.viewer__bar { container: viewer-bar / inline-size; }
+.viewer__more { display: none; }
+@container viewer-bar (max-width: 25rem) {
+  .viewer__tools,
+  .viewer__modes { display: none; }
+  .viewer__more { display: inline-flex; }
+}
+@container viewer-bar (max-width: 26rem) {
+  .viewer__trash .btn__label { display: none; }
+}
+@media (pointer: coarse) {
+  @container viewer-bar (max-width: 32rem) {
+    .viewer__tools,
+    .viewer__modes { display: none; }
+    .viewer__more { display: inline-flex; }
+  }
+}
+
+/* ---------------------------------------------------------------- the body */
+
+.viewer__body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--paper-sunken);
+}
+
+.viewer__ink {
+  position: absolute;
+  inset: 0;
+}
+
+.viewer__missing {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--viewer-pad);
+  text-align: center;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-ui);
+  color: var(--ink-soft);
+}
+.viewer__missing[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- a photo */
+
+.viewer__photo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: zoom-in;
+  outline: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.viewer__photo:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+.viewer__photo[data-grabbing] { cursor: grabbing; }
+
+.viewer__img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  max-height: none;
+  transform-origin: 0 0;
+  opacity: 0;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.viewer__img[hidden] { display: none; }
+.viewer__photo[data-ready] .viewer__img { opacity: 1; }
+.viewer__photo[data-animate] .viewer__img {
+  transition: transform var(--dur-panel) var(--ease-out);
+}
+
+/* ---------------------------------------------------------------- the seam and the grip */
+
+.viewer__seam {
+  position: absolute;
+  z-index: 1;
+  touch-action: none;
+  outline: none;
+}
+.viewer__seam[hidden] { display: none; }
+.viewer__seam::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  transition: background-color var(--dur-hover) var(--ease-out);
+}
+html[data-viewer-side="right"] .viewer__seam {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--viewer-seam);
+  cursor: col-resize;
+}
+html[data-viewer-side="right"] .viewer__seam::after { top: 0; bottom: 0; left: 0; width: 2px; }
+html[data-viewer-side="bottom"] .viewer__seam {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--viewer-seam);
+  cursor: row-resize;
+}
+html[data-viewer-side="bottom"] .viewer__seam::after { left: 0; right: 0; top: 0; height: 2px; }
+.viewer__seam:focus-visible::after,
+html[data-viewer-resizing] .viewer__seam::after { background: var(--accent); }
+.viewer__seam:focus-visible { box-shadow: var(--focus-ring); }
+
+@media (hover: hover) and (pointer: fine) {
+  .viewer__seam:hover::after { background: var(--line-control); }
+}
+
+/* A finger needs more than a hairline: a wider strip and a pill to find. */
+@media (pointer: coarse) {
+  html[data-viewer-side="right"] .viewer__seam { width: var(--viewer-seam-touch); }
+  html[data-viewer-side="bottom"] .viewer__seam { height: var(--viewer-seam-touch); }
+  html[data-viewer-side="bottom"] .viewer__seam::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: var(--sp-1);
+    width: var(--grip-w);
+    height: var(--grip-h);
+    translate: -50% 0;
+    border-radius: var(--r-capsule);
+    background: var(--line-control);
+  }
+  html[data-viewer-side="bottom"] .viewer__bar { padding-top: var(--sp-3); }
+}
+
+.viewer__grip {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: 0;
+  width: var(--viewer-grip);
+  height: var(--viewer-grip);
+  cursor: nwse-resize;
+  touch-action: none;
+  background:
+    linear-gradient(135deg, transparent 55%, var(--line-control) 55%, var(--line-control) 62%, transparent 62%,
+      transparent 72%, var(--line-control) 72%, var(--line-control) 79%, transparent 79%);
+}
+.viewer__grip[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- entrance */
+
+#viewer:not([hidden]) {
+  transition: opacity var(--dur-panel) var(--ease-out), translate var(--dur-panel) var(--ease-out);
+}
+@starting-style {
+  #viewer:not([hidden]) { opacity: 0; }
+  html[data-viewer="card"] #viewer:not([hidden]) { translate: 0 var(--rise); }
+}
+html[data-viewer-resizing] #viewer,
+html[data-viewer-resizing] #viewer * { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #viewer:not([hidden]),
+  .viewer__photo[data-animate] .viewer__img,
+  .viewer__seam::after { transition-duration: 1ms; }
+}
+
+/* ---------------------------------------------------------------- the drop target on the map */
+
+/* The node a dragged picture would go into, while files hover over it. */
+.mv-node[data-media-drop] {
+  outline: 2px solid var(--accent);
+  outline-offset: var(--sp-1);
+  border-radius: var(--r-control);
+}
+
+/* ---------------------------------------------------------------- the media panel */
+
+.media-panel {
+  --media-tile-min: 9rem;
+  --media-check: var(--sp-6);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.media-panel__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) 0;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--line);
+}
+.media-panel__pickall {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+  font-size: var(--fs-ui);
+  color: var(--ink);
+  cursor: var(--mr-cursor, pointer);
+}
+.media-panel__pickall[hidden] { display: none; }
+.media-panel__count {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-ui);
+  color: var(--ink-soft);
+}
+.media-panel__trash { flex: none; margin-left: auto; }
+
+.media-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--media-tile-min), 100%), 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-panel__empty {
+  margin: 0;
+  padding: var(--sp-5) var(--sp-2);
+  text-align: center;
+  font-size: var(--fs-ui);
+  line-height: var(--lh-body);
+  color: var(--ink-soft);
+}
+.media-panel__empty[hidden] { display: none; }
+
+.media-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-popover);
+  background: var(--paper);
+  overflow: hidden;
+  transition: border-color var(--dur-hover) var(--ease-out), background-color var(--dur-hover) var(--ease-out);
+}
+.media-tile[data-chosen] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.media-tile__open {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: zoom-in;
+}
+.media-tile__open:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+.media-tile__thumb {
+  display: block;
+  aspect-ratio: 4 / 3;
+  background: var(--paper-sunken);
+}
+.media-tile__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.media-tile__img:not([src]) { visibility: hidden; }
+.media-tile[data-missing] .media-tile__thumb {
+  outline: 1px dashed var(--danger);
+  outline-offset: calc(-1 * var(--sp-2));
+}
+/* A notebook folder with no page left: an empty frame, not an error. */
+.media-tile[data-empty] .media-tile__thumb {
+  outline: 1px dashed var(--line-strong);
+  outline-offset: calc(-1 * var(--sp-2));
+}
+
+.media-tile__pick {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: var(--media-check);
+  height: var(--media-check);
+  cursor: var(--mr-cursor, pointer);
+}
+.media-tile__check {
+  width: var(--check);
+  height: var(--check);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: var(--mr-cursor, pointer);
+}
+/* A finger-sized target: the control height on coarse pointers. */
+@media (pointer: coarse) {
+  .media-panel { --media-check: var(--control-h); }
+}
+
+.media-tile__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-2) var(--sp-3);
+}
+.media-tile__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  color: var(--ink);
+}
+.media-tile__info {
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+}
+.media-tile__badge {
+  align-self: flex-start;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-chip);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-loose);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.media-tile[data-unused] .media-tile__badge {
+  background: transparent;
+  color: var(--ink-soft);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .media-tile:hover { border-color: var(--line-strong); }
+  .media-tile[data-chosen]:hover { border-color: var(--accent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-tile { transition-duration: 1ms; }
+}
+
+@media (forced-colors: active) {
+  .media-tile[data-chosen] { outline: 2px solid Highlight; }
+  .viewer__seam::after { background: CanvasText; }
+}

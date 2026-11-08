@@ -1,0 +1,60 @@
+# MindRoot on GitHub Pages: the static app, published on every push to main.
+#
+# To turn it on once: the repository's Settings > Pages > Build and
+# deployment > Source: "GitHub Actions". The site is then at
+# https://<owner>.github.io/MindRoot/ (a private repository needs a plan
+# that allows Pages).
+#
+# Only the app's own files are published - index.html, manifest.webmanifest,
+# sw.js, css/, js/, icons/, vendor/, the READMEs and LICENSE, plus .nojekyll -
+# never test/, tools/, docs/ or dist/. tools/pages.js writes that folder and
+# fails the job if it lacks a file index.html loads or the service worker
+# precaches; test/e2e/pages.e2e.js serves the same folder under /MindRoot/.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push waits rather than cancelling one
+# already going out.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Collect the app files
+        run: node tools/pages.js _site
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+          include-hidden-files: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>core-float</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  #stage { position: absolute; left: 100px; top: 50px; width: 600px; height: 400px; }
+  .panel { position: absolute; left: 10px; top: 10px; width: 200px; height: 120px; }
+  .grip { width: 20px; height: 20px; }
+</style>
+</head>
+<body>
+<pre id="out" style="position:fixed;right:0;bottom:0;margin:0;font-size:9px">LOADING</pre>
+<div id="stage"><div class="panel" id="panel"><div class="grip" id="grip"></div></div></div>
+<script src="../../js/core/util.js"></script>
+<script src="../../js/core/i18n.js"></script>
+<script src="../../js/core/bus.js"></script>
+<script src="../../js/core/float.js"></script>
+<script src="../harness.js"></script>
+<script src="core-float.test.js"></script>
+<script>T.run();</script>
+</body>
+</html>

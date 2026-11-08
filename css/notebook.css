@@ -1,0 +1,659 @@
+/* MindRoot - notebooks (js/features/notebook.js): the board view on the
+ * stage, the desk of pages, the page rail, the thumbnails and settings
+ * sheets, the Map | Board switch and the print sheet of a PDF export.
+ *
+ * The drawing itself is the ink editor (css/ink.css), mounted in .nb__ink
+ * over the desk. In pages mode the editor is see-through around its page
+ * (ink.css, .ink[data-page]); the desk under it holds the other pages as
+ * pictures, laid out by the script in one transformed layer. The rail sits
+ * over both at the right edge. Colours are theme tokens: the paper of the
+ * pages is drawn by ns.paper, never here. Durations are the motion tokens,
+ * with a reduced-motion block of their own. */
+
+:root {
+  /* Component sizes, in one place. The rail is a slim line with a wide
+     target (a finger finds it), its handle a pill that grows under a hand. */
+  --nb-rail-w: 28px;
+  /* On an infinite board the rail lies over the drawing itself: only a
+     narrow band round its line, and round its handle, answers a hand;
+     the rest of its strip is drawing surface. */
+  --nb-rail-hit-inf: 14px;
+  --nb-handle-hit-inf: 18px;
+  --nb-rail-line: 2px;
+  --nb-rail-handle: 4px;
+  --nb-rail-handle-active: 6px;
+  --nb-rail-handle-min: 28px;
+  --nb-tick-w: 8px;
+  --nb-page-shadow: var(--shadow-md);
+  /* Where the rail stops, clear of the editor's bars at the top and (on a
+     phone) at the bottom. */
+  --nb-rail-top: calc(var(--bar-h) + 2 * var(--chrome-gap) + var(--safe-top));
+  --nb-rail-bottom: calc(var(--chrome-gap) + var(--safe-bottom));
+  --nb-rail-bottom-compact: calc(var(--bar-h) + 2 * var(--chrome-gap) + var(--safe-bottom));
+  --nb-thumb-w: 7.5rem;
+  --nb-paper-w: 4.75rem;
+  --nb-swatch: 2rem;
+  /* A page's corner, the ring round the chosen page or paper, the bar that
+     shows where a dragged page lands. */
+  --nb-page-r: 2px;
+  --nb-ring: 2px;
+  --nb-ring-gap: 3px;
+  --nb-drop-w: 4px;
+  /* The handle at rest is a hint; under a hand it is a control. */
+  --nb-handle-rest: 0.55;
+  --nb-handle-on: 0.9;
+  --nb-dragged: 0.35;
+  --nb-ghost: 0.9;
+  --nb-disabled: 0.6;
+}
+
+/* ---------------------------------------------------------------- the notebook */
+
+.nb {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 12rem;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--paper);
+}
+.nb[data-mode="pages"] { background: var(--paper-sunken); }
+.nb[data-loading] .nb__ink { visibility: hidden; }
+
+.nb__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The desk: the pages that are not being drawn on, as pictures. */
+.nb__desk {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.nb:not([data-desk]) .nb__desk { display: none; }
+.nb__layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.nb__page {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-shadow: var(--nb-page-shadow);
+}
+.nb__page > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+/* The live page is drawn by the editor above: only its shadow stays. */
+.nb__page[data-live] > img { visibility: hidden; }
+
+.nb__ink {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+/* The editor's save state would say "saved" for strokes the notebook still
+   holds: the app's save state (top bar) is the true one. */
+.nb .ink__status,
+.nb .ink__sep--history { display: none; }
+/* The editor's Undo and Redo are the app's (the notebook routes them to
+   its one history). On the board, wherever the top bar shows its own pair
+   (every screen but a phone's), the editor's would be the same buttons
+   twice; on a phone, where the board covers the thumb bar, they stay, and
+   so does the board's "more", which stands in for the thumb bar's. */
+@media (min-width: 640px) {
+  .nb-stage .ink__actions [data-key="ink.undo"],
+  .nb-stage .ink__actions [data-key="ink.redo"],
+  .nb-stage .ink__sep--host,
+  .nb-stage .ink__host[data-nb="more"] { display: none; }
+}
+
+/* ---------------------------------------------------------------- the rail */
+
+.nb__rail {
+  position: absolute;
+  right: calc(var(--sp-1) + var(--safe-right));
+  top: var(--nb-rail-top);
+  bottom: var(--nb-rail-bottom);
+  z-index: 2;
+  width: var(--nb-rail-w);
+  outline: none;
+  touch-action: none;
+}
+.nb__rail[hidden] { display: none; }
+.nb:has(.ink[data-layout="compact"]) .nb__rail { bottom: var(--nb-rail-bottom-compact); }
+
+.nb__track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  cursor: var(--mr-cursor, pointer);
+}
+.nb__track::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--nb-rail-line);
+  margin-left: calc(var(--nb-rail-line) / -2);
+  border-radius: var(--r-capsule);
+  background: var(--line);
+}
+.nb__ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.nb__tick {
+  position: absolute;
+  left: 50%;
+  width: var(--nb-tick-w);
+  height: 1px;
+  margin-left: calc(var(--nb-tick-w) / -2);
+  background: var(--line-strong);
+}
+.nb__handle {
+  position: absolute;
+  left: 50%;
+  width: var(--nb-rail-handle);
+  min-height: var(--nb-rail-handle-min);
+  margin-left: calc(var(--nb-rail-handle) / -2);
+  border-radius: var(--r-capsule);
+  background: var(--ink-faint);
+  opacity: var(--nb-handle-rest);
+  cursor: grab;
+}
+.nb__rail[data-active] .nb__handle,
+.nb__rail:focus-visible .nb__handle {
+  width: var(--nb-rail-handle-active);
+  margin-left: calc(var(--nb-rail-handle-active) / -2);
+  opacity: var(--nb-handle-on);
+}
+@media (hover: hover) and (pointer: fine) {
+  .nb__rail:hover .nb__handle {
+    width: var(--nb-rail-handle-active);
+    margin-left: calc(var(--nb-rail-handle-active) / -2);
+    opacity: var(--nb-handle-on);
+  }
+}
+.nb__rail:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-capsule); }
+
+/* Infinite mode: the rail's strip is not reserved (the canvas runs to the
+   edge), so a press beside its line falls through to the editor - a
+   stroke can start at the very edge, and a dot there never changes canvas.
+   The line and the handle (a little wider) keep their gestures. */
+.nb[data-mode="infinite"] .nb__rail { pointer-events: none; }
+.nb[data-mode="infinite"] .nb__track {
+  width: var(--nb-rail-hit-inf);
+  margin: 0 auto;
+  pointer-events: auto;
+}
+.nb[data-mode="infinite"] .nb__handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--nb-handle-hit-inf);
+  translate: -50% 0;
+}
+
+/* "3 / 12" beside the handle while the pages move; pressed, it opens the
+   thumbnails. Glass, like the editor's bars. */
+.nb__bubble {
+  position: absolute;
+  right: calc(100% + var(--sp-1));
+  translate: 0 -50%;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h);
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-capsule);
+  background: var(--glass-regular);
+  -webkit-backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  box-shadow: inset 0 0 0 0.5px var(--glass-rim), var(--glass-shadow);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: var(--mr-cursor, pointer);
+  opacity: 0;
+  pointer-events: none;
+}
+.nb__rail[data-active] .nb__bubble,
+.nb__rail:focus-visible .nb__bubble {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: hover) and (pointer: fine) {
+  .nb__rail:hover .nb__bubble { opacity: 1; pointer-events: auto; }
+}
+
+/* ---------------------------------------------------------------- the board on the stage */
+
+.nb-stage {
+  position: absolute;
+  inset: var(--nb-top, 0px) 0 0 0;
+  z-index: var(--z-map-overlay);
+}
+/* The map stays laid out under the board (it keeps its camera and its
+   measures) but is not seen, and its floating tools go with it. */
+html[data-board] #stage > .mv { visibility: hidden; }
+html[data-board] #floaters,
+html[data-board] #zoombar,
+html[data-board] .edge-swipe { display: none; }
+@media (max-width: 639px) {
+  /* The editor's tools stand where the thumb bar would. */
+  html[data-board] #thumbbar { display: none; }
+  html[data-board] #main { --thumb-space: 0px; }
+}
+
+/* ---------------------------------------------------------------- the switch Map | Board */
+
+.nb-switch { flex: none; }
+.nb-switch[hidden] { display: none; }
+.nb-switch .icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+/* In the top capsule: labels on wide screens, icons where room is short. */
+@media (max-width: 1023px) {
+  .nb-switch .nb-switch__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .nb-switch .seg__opt { padding: 0 var(--sp-2); }
+}
+@media (min-width: 1024px) {
+  .nb-switch .icon { display: none; }
+}
+/* The phone's copy lives in the lead capsule; the wide one in the actions
+   capsule (hidden on phones with it). */
+.nb-switch--compact { margin-left: var(--sp-1); }
+@media (min-width: 640px) {
+  .nb-switch--compact { display: none; }
+}
+.nb-switch .seg__opt:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+/* In a capsule the switch is a pill like the buttons beside it: square
+   corners against the capsule's round end looked pinched on a phone. */
+.capsule .nb-switch,
+.capsule .nb-switch .seg__opt { border-radius: var(--r-capsule); }
+/* Icon-only under a finger: as wide as it is high, a whole target. */
+@media (pointer: coarse) {
+  .nb-switch .seg__opt { min-width: var(--control-h); }
+}
+
+/* ---------------------------------------------------------------- the sheets */
+
+.nb-sheet .sheet__body { overscroll-behavior: contain; }
+
+/* Thumbnails */
+.nb-thumbs { display: flex; flex-direction: column; gap: var(--sp-3); }
+.nb-thumbs__bar { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.nb-thumbs__hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+}
+.nb-thumbs__grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--nb-thumb-w), 1fr));
+  gap: var(--sp-4) var(--sp-3);
+  padding: var(--sp-1);
+}
+.nb-thumb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.nb-thumb[data-dragging] { opacity: var(--nb-dragged); }
+.nb-thumb__page {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nb-page-r);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line);
+  overflow: hidden;
+  cursor: var(--mr-cursor, pointer);
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.nb-thumb__page > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+.nb-thumb__page[aria-current="page"] { box-shadow: 0 0 0 var(--nb-ring) var(--accent), var(--shadow-sm); }
+.nb-thumb__page:focus-visible { outline: var(--focus-ring); outline-offset: var(--nb-ring-gap); }
+.nb-thumb__n {
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.nb-thumb__more {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-capsule);
+  background: var(--glass-thick);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  cursor: var(--mr-cursor, pointer);
+}
+.nb-thumb__more[hidden] { display: none; }
+.nb-thumb__more .ink__icon {
+  width: var(--icon);
+  height: var(--icon);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nb-thumb__more:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+@media (hover: hover) and (pointer: fine) {
+  .nb-thumb__more { opacity: 0; }
+  .nb-thumb:hover .nb-thumb__more,
+  .nb-thumb__more:focus-visible,
+  .nb-thumb__more[aria-expanded="true"] { opacity: 1; }
+}
+.nb-thumb--ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: var(--z-drag);
+  pointer-events: none;
+  opacity: var(--nb-ghost);
+  box-shadow: var(--shadow-lift);
+}
+.nb-thumbs__drop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--nb-drop-w);
+  border-radius: var(--r-capsule);
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* Settings */
+.nb-set { display: flex; flex-direction: column; gap: var(--sp-5); }
+.nb-set__section { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.nb-set__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-semibold);
+}
+.nb-set__note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+}
+.nb-set__section .seg { align-self: flex-start; max-width: 100%; }
+.nb-set__size { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.nb-set__select {
+  min-height: var(--control-h);
+  max-width: 100%;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-control);
+  border-radius: var(--r-control);
+  background: var(--paper-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-input);
+}
+.nb-set__dims { display: flex; flex-wrap: wrap; gap: var(--sp-3); width: 100%; }
+.nb-set__dim { display: flex; flex-direction: column; gap: var(--sp-1); color: var(--ink-soft); font-size: var(--fs-xs); }
+.nb-set__dim input {
+  width: 7rem;
+  min-height: var(--control-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-control);
+  border-radius: var(--r-control);
+  background: var(--paper-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-input);
+  font-variant-numeric: tabular-nums;
+}
+.nb-set__select:focus-visible,
+.nb-set__dim input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.nb-set__papers { display: flex; flex-direction: column; gap: var(--sp-2); }
+.nb-set__group {
+  margin: var(--sp-2) 0 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-small);
+}
+.nb-set__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--nb-paper-w), 1fr));
+  gap: var(--sp-2);
+}
+.nb-paper {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-1);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: var(--mr-cursor, pointer);
+}
+.nb-paper__pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 148 / 210;
+  border-radius: var(--nb-page-r);
+  background-color: var(--paper-raised);
+  background-size: cover;
+  background-position: center;
+  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line);
+  color: var(--ink-soft);
+}
+.nb-paper__icon {
+  width: var(--icon);
+  height: var(--icon);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nb-paper__label {
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-tight);
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.nb-paper[aria-checked="true"] .nb-paper__pic { box-shadow: 0 0 0 var(--nb-ring) var(--accent), var(--shadow-sm); }
+.nb-paper[aria-checked="true"] .nb-paper__label { font-weight: var(--fw-semibold); }
+.nb-paper:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.nb-paper:disabled { cursor: var(--mr-cursor, default); opacity: var(--nb-disabled); }
+@media (hover: hover) and (pointer: fine) {
+  .nb-paper:hover:not(:disabled) { background: var(--hover); }
+}
+
+.nb-set__bg { display: flex; flex-direction: column; gap: var(--sp-3); }
+.nb-set__scope { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
+.nb-set__swatches { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.nb-swatch {
+  position: relative;
+  display: inline-flex;
+  width: var(--nb-swatch);
+  height: var(--nb-swatch);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  cursor: var(--mr-cursor, pointer);
+}
+/* A finger's target is the whole control height. */
+.nb-swatch::after { content: ""; position: absolute; inset: calc((var(--nb-swatch) - var(--control-h)) / 2); }
+.nb-swatch[aria-checked="true"],
+.nb-swatch--other[data-on] { box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 0 var(--nb-ring) var(--paper-raised), 0 0 0 calc(2 * var(--nb-ring)) var(--accent); }
+.nb-swatch:focus-visible,
+.nb-swatch--other:focus-within { outline: var(--focus-ring); outline-offset: calc(2 * var(--nb-ring)); }
+.nb-swatch--other {
+  background: conic-gradient(var(--swatch), var(--swatch)), var(--paper-sunken);
+  overflow: hidden;
+}
+.nb-swatch--other:not([data-on])::before {
+  content: "+";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-weight: var(--fw-semibold);
+}
+.nb-swatch--other input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: var(--mr-cursor, pointer);
+}
+
+/* ---------------------------------------------------------------- motion */
+
+.nb__bubble,
+.nb__handle {
+  transition:
+    opacity var(--dur-hover) var(--ease-out),
+    width var(--dur-hover) var(--ease-out),
+    margin-left var(--dur-hover) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nb__bubble,
+  .nb__handle { transition: opacity 1ms linear; }
+}
+
+/* ---------------------------------------------------------------- materials, fallbacks */
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .nb__bubble { background: var(--paper-raised); }
+}
+:root[data-transparency="reduce"] .nb__bubble {
+  background: var(--paper-raised);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-transparency]) .nb__bubble {
+    background: var(--paper-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (forced-colors: active) {
+  .nb__track::before,
+  .nb__tick,
+  .nb__handle { background: CanvasText; forced-color-adjust: none; }
+  .nb__bubble { border: 1px solid CanvasText; background: Canvas; }
+  .nb-thumb__page[aria-current="page"],
+  .nb-paper[aria-checked="true"] .nb-paper__pic { outline: 2px solid Highlight; }
+  .nb-swatch { forced-color-adjust: none; }
+}
+
+/* ---------------------------------------------------------------- print (PDF export) */
+
+/* Every page of the notebook, each on a page of its own size (named @page
+   rules are written by the script): nothing else prints. */
+.nb-print { display: none; }
+@media print {
+  html[data-nb-printing],
+  html[data-nb-printing] body {
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    background: transparent;
+  }
+  html[data-nb-printing] body > :not(.nb-print) { display: none !important; }
+  html[data-nb-printing] .nb-print { display: block !important; }
+  .nb-print__page {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+  }
+  .nb-print__page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  /* Out of the flow: an in-flow picture larger than the page before it
+     sends Chromium back to its default paper size for its page (a small
+     canvas then a large one printed the large one on Letter). */
+  .nb-print__page > svg {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+  }
+}

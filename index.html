@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<!-- No user-scalable=no: page zoom stays available for reading. The map
+     blocks it on its own surface with touch-action and handles pinch itself.
+     viewport-fit=cover hands the page the notch and home-bar areas; the CSS
+     keeps chrome clear of them with env(safe-area-inset-*). -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fbfbfc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131519" media="(prefers-color-scheme: dark)">
+<meta name="description" content="MindRoot: mind maps written in plain Markdown, kept on your device, offline.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MindRoot">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<title>MindRoot</title>
+<!-- Runs before any stylesheet so the first paint already has the chosen
+     theme (a dark-theme reader must never see a white flash) and the chosen
+     transparency (and the system's cursor, when asked for). Storage can throw in private windows: then the system
+     preference decides, which is also the default. -->
+<script>
+(function () {
+  var root = document.documentElement;
+  var theme = null;
+  var prefs = null;
+  try { theme = window.localStorage.getItem('mindroot2:theme'); } catch (e) { theme = null; }
+  try { prefs = JSON.parse(window.localStorage.getItem('mindroot2:prefs') || 'null'); } catch (e) { prefs = null; }
+  if (theme === 'light' || theme === 'dark') {
+    root.setAttribute('data-theme', theme);
+    var color = theme === 'dark' ? '#131519' : '#fbfbfc';
+    var metas = document.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', color);
+    var scheme = document.querySelector('meta[name="color-scheme"]');
+    if (scheme) scheme.setAttribute('content', theme);
+  }
+  var p = prefs && prefs.prefs;
+  if (p && p.reduceTransparency === true) root.setAttribute('data-transparency', 'reduce');
+  if (p && p.sidebarOpen === false) root.setAttribute('data-sidebar', 'closed');
+  if (p && p.appCursor === false) root.setAttribute('data-cursor', 'system');
+})();
+</script>
+<link rel="icon" href="icons/logo-compact.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/chrome.css">
+<link rel="stylesheet" href="css/map.css">
+<link rel="stylesheet" href="css/editor.css">
+<link rel="stylesheet" href="css/source.css">
+<link rel="stylesheet" href="css/media.css">
+<link rel="stylesheet" href="css/ink.css">
+<link rel="stylesheet" href="css/notebook.css">
+<link rel="stylesheet" href="css/ai.css">
+<link rel="stylesheet" href="css/mentions.css">
+<link rel="stylesheet" href="css/workspace.css">
+<link rel="stylesheet" href="css/motion.css">
+</head>
+<body>
+
+<!-- Seen only without the style sheets: index.html opened from inside a ZIP
+     without its folder. base.css hides it everywhere else. -->
+<p class="zip-hint">MindRoot needs its folder: extract the whole ZIP, then open index.html from the extracted folder.</p>
+
+<!-- The icon set: 24-unit stroke icons (1.7 stroke, round caps, set in
+     base.css), used as <svg class="icon"><use href="#i-name"/></svg> through
+     ns.ui.icon(name). Inline because an external sprite is blocked on
+     file:// in Chromium. Filled details say fill="currentColor" themselves. -->
+<svg class="icon-sprite" aria-hidden="true" focusable="false">
+  <!-- structure and navigation -->
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M5.5 8h1.5M5.5 11h1.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.4" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-more-vertical" viewBox="0 0 24 24"><circle cx="12" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 24 24"><path d="M8 10l4 4 4-4"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5.5"/><path d="M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v13.5"/><path d="M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5.5"/><path d="M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h13.5"/><path d="M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6"/><path d="M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v13"/><path d="M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-8.5 8.5"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-drag-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/></symbol>
+
+  <!-- workspace -->
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-project" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 10h18"/></symbol>
+  <symbol id="i-template" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9.5 13.5h5M12 11v5"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><circle cx="7" cy="12" r="2.4"/><circle cx="17" cy="6" r="2"/><circle cx="17" cy="12" r="2"/><circle cx="17" cy="18" r="2"/><path d="M9.3 11.2L15 6.8M9.4 12H15M9.3 12.8L15 17.2"/></symbol>
+  <symbol id="i-new" viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15h6"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="M13 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8z"/><path d="M13 3v5h5"/><path d="M8.5 14h6"/><path d="M12 11l3 3-3 3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a1 1 0 0 0-1 1v9"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M12 17v-5.5"/><path d="M9.5 13.5L12 11l2.5 2.5"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 4v12"/><path d="M8 12l4 4 4-4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/><path d="M5 19.5h14"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="M8 7.5l4-4 4 4"/><path d="M8 10.5H6a1 1 0 0 0-1 1V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8.5a1 1 0 0 0-1-1h-2"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/><path d="M12 8v4.2l3 1.8"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M4 9h12a4 4 0 0 1 0 8h-2"/><path d="M7 6L4 9l3 3"/><path d="M20 15H8a4 4 0 0 1 0-8h2"/><path d="M17 18l3-3-3-3"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4v4.5H15"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+  <symbol id="i-list-number" viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 4.5l1.5-.8V9"/><path d="M3.6 12.6a1.4 1.4 0 0 1 2.8.2c0 1.1-2.8 1.7-2.8 3.2h2.9"/><path d="M4.5 19.5h.01"/></symbol>
+  <symbol id="i-list-check" viewBox="0 0 24 24"><path d="M11 6h9M11 12h9M11 18h9"/><path d="M3.5 6l1.6 1.6L8 4.8"/><path d="M3.5 12l1.6 1.6L8 10.8"/><rect x="3.8" y="16" width="4" height="4" rx="1"/></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M9.5 5.5L12 3l2.5 2.5M9.5 18.5L12 21l2.5-2.5M5.5 9.5L3 12l2.5 2.5M18.5 9.5L21 12l-2.5 2.5"/></symbol>
+
+  <!-- the map and its nodes -->
+  <symbol id="i-child" viewBox="0 0 24 24"><path d="M5 5v8a4 4 0 0 0 4 4h9"/><path d="M15 13l4 4-4 4"/></symbol>
+  <symbol id="i-sibling" viewBox="0 0 24 24"><rect x="3.5" y="4" width="11" height="6" rx="2"/><rect x="3.5" y="14" width="11" height="6" rx="2"/><path d="M19 14.5v5M16.5 17h5"/></symbol>
+  <symbol id="i-branch-right" viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><path d="M9 12h11"/><path d="M15.5 7.5L20 12l-4.5 4.5"/></symbol>
+  <symbol id="i-branch-left" viewBox="0 0 24 24"><circle cx="18" cy="12" r="3"/><path d="M15 12H4"/><path d="M8.5 7.5L4 12l4.5 4.5"/></symbol>
+  <symbol id="i-rename" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M14.5 5.5l3 3L9 17H6v-3z"/></symbol>
+  <symbol id="i-indent" viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11"/><path d="M3 9l3 3-3 3z"/></symbol>
+  <symbol id="i-outdent" viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11"/><path d="M6 9l-3 3 3 3z"/></symbol>
+  <symbol id="i-fold" viewBox="0 0 24 24"><path d="M11 6h10M11 12h10M11 18h10"/><path d="M4 8l2.5 2.5L9 8"/><path d="M4 16l2.5-2.5L9 16"/></symbol>
+  <symbol id="i-unfold" viewBox="0 0 24 24"><path d="M11 6h10M11 12h10M11 18h10"/><path d="M4 10.5L6.5 8 9 10.5"/><path d="M4 13.5L6.5 16 9 13.5"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/><path d="M8.5 11h5M11 8.5v5"/></symbol>
+  <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/><path d="M8.5 11h5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4 9h11a5 5 0 0 1 0 10h-6"/><path d="M8 5L4 9l4 4"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 9H9a5 5 0 0 0 0 10h6"/><path d="M16 5l4 4-4 4"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M20 4H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3v4l4-4h9a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z"/><path d="M7 9h10M7 12h6"/></symbol>
+  <symbol id="i-edge-note" viewBox="0 0 24 24"><path d="M3 19c7 0 11-14 18-14"/><circle cx="11.5" cy="12.5" r="3.4"/></symbol>
+  <symbol id="i-notes-all" viewBox="0 0 24 24"><path d="M16 3H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2v3l3.5-3H16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z"/><path d="M20 8h1v9a1 1 0 0 1-1 1h-6l-3 3v-3"/></symbol>
+  <symbol id="i-color" viewBox="0 0 24 24"><path d="M12 3.5c3.6 4.2 6 7.4 6 10.5a6 6 0 0 1-12 0c0-3.1 2.4-6.3 6-10.5z"/></symbol>
+  <symbol id="i-tint" viewBox="0 0 24 24"><path d="M4 16l5.5-12L15 16"/><path d="M6.2 12h7"/><path d="M4 20h16"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="8.6" cy="8.6" r="1.25" fill="currentColor" stroke="none"/><circle cx="15.4" cy="8.6" r="1.25" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none"/><circle cx="8.6" cy="15.4" r="1.25" fill="currentColor" stroke="none"/><circle cx="15.4" cy="15.4" r="1.25" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3.5h7l4.5 4.5v11A1.5 1.5 0 0 1 17 20.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M14 3.5V8h4.5M8.5 12h7M8.5 15.5h5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z"/><path d="M8 10h8M8 13h5"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.6l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></symbol>
+  <symbol id="i-star-fill" viewBox="0 0 24 24"><path style="fill: currentColor" d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.6l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M4 5h9l7 7-8 8-8-8z"/><circle cx="9" cy="10" r="1.5"/></symbol>
+  <symbol id="i-tidy" viewBox="0 0 24 24"><path d="M4 6h9M4 12h16M4 18h12"/><path d="M18 4.5v3M16.5 6h3"/></symbol>
+  <symbol id="i-thread" viewBox="0 0 24 24"><circle cx="5.5" cy="18.5" r="2.5"/><path d="M8 17c5-1 4-7 8-9"/><circle cx="18.5" cy="6" r="2.5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></symbol>
+  <symbol id="i-task" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.8 2.8L16.5 9.5"/></symbol>
+  <symbol id="i-task-empty" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+  <symbol id="i-view" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M9.9 5.8A10 10 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a17 17 0 0 1-2.6 3.4M6.5 7.3C3.7 9 2 12 2 12s3.6 6.5 10 6.5a9.6 9.6 0 0 0 4.6-1.2"/><path d="M9.9 10.1a2.6 2.6 0 0 0 3.8 3.6"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4"/><path d="M15 8l4 4-4 4"/></symbol>
+  <symbol id="i-source" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4"/><path d="M15 8l4 4-4 4"/></symbol>
+  <symbol id="i-markdown" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M6 15V9l2.5 3L11 9v6"/><path d="M16 9v6"/><path d="M13.8 12.8L16 15l2.2-2.2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 7.8-1.2"/></symbol>
+
+  <!-- pictures, drawings, the board, the viewer -->
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M10 4l1.7 4.6L16.5 10l-4.8 1.4L10 16l-1.7-4.6L3.5 10l4.8-1.4z"/><path d="M18 14l.9 2.3 2.3.9-2.3.9L18 20.4l-.9-2.3-2.3-.9 2.3-.9z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-5 5-2-2-6 5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5a2 2 0 0 1 2-2h2l1.5-2h5l1.5 2h2a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.5"/></symbol>
+  <symbol id="i-image-left" viewBox="0 0 24 24"><rect x="3" y="6" width="9" height="12" rx="1.5"/><path d="M15 9h6M15 13h6M15 17h4"/></symbol>
+  <symbol id="i-image-right" viewBox="0 0 24 24"><rect x="12" y="6" width="9" height="12" rx="1.5"/><path d="M3 9h6M3 13h6M3 17h4"/></symbol>
+  <symbol id="i-image-above" viewBox="0 0 24 24"><rect x="4" y="3" width="13" height="9" rx="1.5"/><path d="M4 16h16M4 19.5h9"/></symbol>
+  <symbol id="i-image-off" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M21 16l-5-5-5 5-2-2-6 5"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-img-left" viewBox="0 0 24 24"><rect x="3" y="6" width="9" height="12" rx="1.5"/><path d="M15 9h6M15 13h6M15 17h4"/></symbol>
+  <symbol id="i-img-right" viewBox="0 0 24 24"><rect x="12" y="6" width="9" height="12" rx="1.5"/><path d="M3 9h6M3 13h6M3 17h4"/></symbol>
+  <symbol id="i-img-above" viewBox="0 0 24 24"><rect x="4" y="3" width="13" height="9" rx="1.5"/><path d="M4 16h16M4 19.5h9"/></symbol>
+  <symbol id="i-img-off" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M21 16l-5-5-5 5-2-2-6 5"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-draw" viewBox="0 0 24 24"><path d="M3 17.5c2.5-6 4.5-8 6.5-8s2 4 4 4 3.5-4.5 7.5-9.5"/><path d="M3 20.5h18"/></symbol>
+  <symbol id="i-draw-off" viewBox="0 0 24 24"><path d="M3 16.5c2.5-6 4.5-8 6.5-8s2 4 4 4 3.5-4.5 7.5-9.5"/><path d="M3 20.5h18"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-draw-left" viewBox="0 0 24 24"><rect x="3" y="6" width="9" height="12" rx="1.5"/><path d="M5 14c1.2-3 2-4 2.8-4s.8 2 1.6 2"/><path d="M15 9h6M15 13h6M15 17h4"/></symbol>
+  <symbol id="i-draw-right" viewBox="0 0 24 24"><rect x="12" y="6" width="9" height="12" rx="1.5"/><path d="M14 14c1.2-3 2-4 2.8-4s.8 2 1.6 2"/><path d="M3 9h6M3 13h6M3 17h4"/></symbol>
+  <symbol id="i-draw-above" viewBox="0 0 24 24"><rect x="4" y="3" width="13" height="9" rx="1.5"/><path d="M6.5 9.5c1.8-4 3-5.5 4.2-5.5s1.2 3 2.4 3"/><path d="M4 16h16M4 19.5h9"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4"/><path d="M8 20.5h8"/><path d="M7 11c1.5-3 2.5-4 3.5-4s1 2 2 2 2-2.5 4.5-4.5"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="7.5" y="8.5" width="9" height="7" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-split" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12.5" y="6.5" width="7" height="11" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="4.5" y="6.5" width="15" height="11" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-half-left" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="4.5" y="6.5" width="7" height="11" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-half-right" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12.5" y="6.5" width="7" height="11" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-half-top" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="4.5" y="6.5" width="15" height="4.5" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-half-bottom" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="4.5" y="13" width="15" height="4.5" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6"/><path d="M20 4l-6.5 6.5M4 20l6.5-6.5"/></symbol>
+  <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><path d="M14 4v6h6M10 20v-6H4"/><path d="M20 4l-6 6M4 20l6-6"/></symbol>
+
+  <!-- drawing tools -->
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 21v-3.5"/><path d="M8.5 13.5L12 3l3.5 10.5L12 17.5z"/><path d="M12 10.5v2"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1.5-5.5L15.5 4.5l4 4-10 10z"/><path d="M5.5 14.5l4 4"/><path d="M13 7l4 4"/></symbol>
+  <symbol id="i-marker" viewBox="0 0 24 24"><path d="M9.5 15l-3.5 3.5V20h3.5l3.5-3.5"/><path d="M9.5 15l7-9.5a2 2 0 0 1 3 0l.5.5a2 2 0 0 1 0 3L13 16.5z"/></symbol>
+  <symbol id="i-brush" viewBox="0 0 24 24"><path d="M18.5 3.5l2 2-8 8-2-2z"/><path d="M10.5 11.5c-2.5 0-4 1.5-4 3.5 0 1.5-1 2.5-3 3 2 1.5 6 1.5 7.5-.5 1-1.3 1.5-2.5 1.5-4"/></symbol>
+  <symbol id="i-highlighter" viewBox="0 0 24 24"><path d="M4 20.5h7"/><path d="M8 16.5l-2-2 9-9 4 4-9 9z"/><path d="M11 15.5l-4-4"/><path d="M7.5 18.5l-1.5 1.5"/></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M8.5 18.5 4.2 14.2a1.8 1.8 0 0 1 0-2.5l7.5-7.5a1.8 1.8 0 0 1 2.5 0l5.1 5.1a1.8 1.8 0 0 1 0 2.5l-7 7"/><path d="M8.5 9.4l6.1 6.1"/><path d="M3 20.5h18"/></symbol>
+  <symbol id="i-shape-rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5"/></symbol>
+  <symbol id="i-shape-ellipse" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8.5" ry="6"/></symbol>
+  <symbol id="i-shape-line" viewBox="0 0 24 24"><path d="M5 19L19 5"/></symbol>
+  <symbol id="i-shape-arrow" viewBox="0 0 24 24"><path d="M5 19L19 5"/><path d="M10 5h9v9"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6.5V4.5h14v2"/><path d="M12 4.5v15"/><path d="M9 19.5h6"/></symbol>
+  <symbol id="i-select" viewBox="0 0 24 24"><path d="M5.5 3.5l12.5 7-5.8 1.6-2.7 5.9z"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 10V4.5a1.5 1.5 0 0 1 3 0V11"/><path d="M14 10.5V6a1.5 1.5 0 0 1 3 0v6"/><path d="M17 9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-2.7L4.3 14.6a1.5 1.5 0 0 1 2.4-1.8L8 14.5"/></symbol>
+
+  <!-- text formatting -->
+  <symbol id="i-bold" viewBox="0 0 24 24"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7z"/><path d="M7 12h7a3.5 3.5 0 0 1 0 7H7z"/></symbol>
+  <symbol id="i-italic" viewBox="0 0 24 24"><path d="M10 5h8M6 19h8M14.5 5l-5 14"/></symbol>
+  <symbol id="i-underline" viewBox="0 0 24 24"><path d="M7 4.5v6a5 5 0 0 0 10 0v-6"/><path d="M5.5 20h13"/></symbol>
+  <symbol id="i-strike" viewBox="0 0 24 24"><path d="M4.5 12h15"/><path d="M16.5 7.5c-.6-1.8-2.3-3-4.5-3-2.5 0-4.5 1.4-4.5 3.5 0 1.5 1 2.5 2.5 3"/><path d="M8 16.5c.6 1.8 2.3 3 4.5 3 2.5 0 4.5-1.4 4.5-3.5 0-.8-.3-1.5-.8-2"/></symbol>
+  <symbol id="i-h-size" viewBox="0 0 24 24"><path d="M5 5v14M13 5v14M5 12h8"/><path d="M16.5 13.5l2.5-1.5v7"/></symbol>
+  <symbol id="i-caption" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="10" rx="1.5"/><path d="M6 18h12M8.5 21h7"/></symbol>
+  <symbol id="i-clear-format" viewBox="0 0 24 24"><path d="M6 5h12"/><path d="M12 5l-3 14"/><path d="M14 15l5 5M19 15l-5 5"/></symbol>
+
+  <!-- app, help, settings, status -->
+  <symbol id="i-command" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 10l2.5 2L7 14"/><path d="M11.5 14.5H16"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7.5 14h9"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.6a2.8 2.8 0 0 1 5.4.9c0 2-2.6 2.1-2.6 3.9"/><path d="M12 17.3v.1"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.7v.1"/></symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 4.9a2 2 0 0 1 3.4 0l7.4 12.6a2 2 0 0 1-1.7 3H4.6a2 2 0 0 1-1.7-3z"/><path d="M12 9.5v4.5"/><path d="M12 17.2v.1"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-chrome" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v1.5M12 19.5V21M3 12h1.5M19.5 12H21M5.6 5.6l1.1 1.1M17.3 17.3l1.1 1.1M5.6 18.4l1.1-1.1M17.3 6.7l1.1-1.1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6M12 16v4"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.6 3.6 5.4 3.6 8.5s-1.2 5.9-3.6 8.5c-2.4-2.6-3.6-5.4-3.6-8.5S9.6 6.1 12 3.5z"/></symbol>
+  <symbol id="i-glass" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="5"/><path d="M7.5 10.5c.9-.9 2-1.4 3.2-1.5"/></symbol>
+  <symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="M4 4l16 16"/><path d="M8.6 16.4a4.9 4.9 0 0 1 6.2-.4"/><path d="M5.2 12.9a9.8 9.8 0 0 1 3.9-2.3"/><path d="M14.6 10.3a9.8 9.8 0 0 1 4.2 2.6"/><path d="M2 9.4a14.5 14.5 0 0 1 4.4-2.8"/><path d="M10.7 5.6a14.5 14.5 0 0 1 11.3 3.8"/><path d="M12 19.6v.1"/></symbol>
+  <symbol id="i-offline" viewBox="0 0 24 24"><path d="M4 4l16 16"/><path d="M8.6 16.4a4.9 4.9 0 0 1 6.2-.4"/><path d="M5.2 12.9a9.8 9.8 0 0 1 3.9-2.3"/><path d="M14.6 10.3a9.8 9.8 0 0 1 4.2 2.6"/><path d="M2 9.4a14.5 14.5 0 0 1 4.4-2.8"/><path d="M10.7 5.6a14.5 14.5 0 0 1 11.3 3.8"/><path d="M12 19.6v.1"/></symbol>
+</svg>
+
+<div id="app">
+  <aside id="sidebar" tabindex="-1" aria-label="Projects and maps" data-i18n-aria-label="app.region.sidebar"></aside>
+
+  <main id="main">
+    <header id="topbar">
+      <div class="topbar__slot topbar__slot--lead">
+        <div class="capsule glass" id="topbar-lead" data-liquid>
+          <button type="button" class="btn btn--icon" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Projects and maps" data-i18n-aria-label="app.cmd.sidebar"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sidebar"></use></svg></button>
+          <div class="title" id="title" role="heading" aria-level="1"><span class="title__project">MindRoot</span><span class="title__sep" aria-hidden="true">/</span><span class="title__map"></span></div>
+          <span class="save" id="save-state" data-state="idle" aria-hidden="true"><span class="save__dot"></span><span class="save__text"></span></span>
+          <span class="visually-hidden" id="save-status" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="topbar__slot topbar__slot--actions">
+        <div class="capsule glass" id="topbar-actions" role="toolbar" aria-label="Actions" data-i18n-aria-label="app.region.actions" data-liquid></div>
+      </div>
+    </header>
+
+    <div id="banners"></div>
+
+    <div id="stage" role="region" aria-label="Map" data-i18n-aria-label="app.region.stage">
+      <div id="floaters"></div>
+    </div>
+
+    <section id="source" aria-label="Markdown" data-i18n-aria-label="app.region.source" hidden></section>
+  </main>
+
+  <div id="thumbbar" class="capsule glass" role="toolbar" aria-label="Actions" data-i18n-aria-label="app.region.actions" hidden></div>
+</div>
+
+<div id="layers"></div>
+
+<div id="drop" hidden><span class="drop__label"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-import"></use></svg><span data-i18n="app.drop">Drop to bring it in</span></span></div>
+
+<noscript>
+  <p>MindRoot needs JavaScript to run. It runs entirely on this device: nothing is sent anywhere.</p>
+</noscript>
+
+<script src="js/core/util.js"></script>
+<script src="js/core/i18n.js"></script>
+<script src="js/core/bus.js"></script>
+<script src="js/core/prefs.js"></script>
+<script src="js/core/ui.js"></script>
+<script src="js/core/float.js"></script>
+<script src="js/core/commands.js"></script>
+<script src="js/model/color.js"></script>
+<script src="js/model/doc.js"></script>
+<script src="js/model/store.js"></script>
+<script src="js/model/zip.js"></script>
+<script src="js/model/storage.js"></script>
+<script src="js/model/archive.js"></script>
+<script src="js/map/layout.js"></script>
+<script src="js/map/gestures.js"></script>
+<script src="js/map/mapview.js"></script>
+<script src="js/map/session.js"></script>
+<script src="js/map/notes.js"></script>
+<script src="js/map/editor.js"></script>
+<script src="js/features/colorpicker.js"></script>
+<script src="js/features/source.js"></script>
+<script src="js/features/export.js"></script>
+<script src="js/features/paper.js"></script>
+<script src="js/features/ink.js"></script>
+<script src="js/features/notebook.js"></script>
+<script src="js/features/ai.js"></script>
+<script src="js/features/ai-ui.js"></script>
+<script src="js/features/ai-chat.js"></script>
+<script src="js/features/mentions.js"></script>
+<script src="js/features/media.js"></script>
+<script src="js/features/sidebar.js"></script>
+<script src="js/features/trash.js"></script>
+<script src="js/features/copies.js"></script>
+<script src="js/features/palette.js"></script>
+<script src="js/features/settings.js"></script>
+<script src="js/features/help.js"></script>
+<script src="js/features/welcome.js"></script>
+<script src="js/features/tabs.js"></script>
+<script src="js/features/pwa.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

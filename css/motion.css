@@ -1,0 +1,400 @@
+/* MindRoot - motion: every duration, curve and transition of the chrome.
+ *
+ * The only place durations and curves are defined. Motion earns its place by
+ * saying where something came from or went, that a press was heard, or that
+ * state changed; nothing animates on keyboard paths used a hundred times a
+ * day (the palette, shortcuts, arrow navigation), and no input ever waits for
+ * an animation.
+ *
+ * Rules this file keeps:
+ *   - transitions, not keyframes, for anything that can be retriggered: a
+ *     transition retargets from where it is, a keyframe restarts from zero;
+ *   - the independent translate and scale properties, never transform, so a
+ *     motion composes with any centring and resting values stay "none" (a
+ *     scale of 1 would still make a containing block for fixed children);
+ *   - no transition: all, no ease-in, no scale(0); exits use --ease-out at
+ *     about 0.75x the entry, along the path they came in;
+ *   - [hidden] panels animate out with transition-behavior: allow-discrete
+ *     and in with @starting-style; engines without them simply show and hide;
+ *   - reduced motion is gentler, not silent: opacity crossfades stay, travel
+ *     and scale go, and "instant" is 1ms (never 0, or the discrete display
+ *     step that hides a [hidden] panel can be skipped). */
+
+:root {
+  --dur-press: 100ms;    /* a control giving under the finger */
+  --dur-hover: 120ms;    /* tint arriving on hover */
+  --dur-pop: 160ms;      /* menus, popovers, small bars */
+  --dur-panel: 220ms;    /* panels, banners */
+  --dur-overlay: 260ms;  /* dialogs and their scrim */
+  --dur-drawer: 300ms;   /* the sidebar drawer */
+  --dur-toast: 320ms;
+  --dur-sheet: 420ms;    /* bottom sheets, programmatic opens */
+  --dur-map: 220ms;      /* node growth and folds (mapview) */
+  --dur-camera: 280ms;   /* camera moves that are not from the keyboard */
+  --dur-theme: 200ms;    /* the theme crossfade */
+  --dur-tooltip: 125ms;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);       /* entering, exiting, press */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);   /* moving on screen */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);    /* sheets and drawers */
+
+  --rise: 6px;
+  --press-scale: 0.97;
+  --pop-scale: 0.96;
+  --dialog-scale: 0.97;
+}
+
+/* ---------------------------------------------------------------- press, hover */
+
+.btn,
+.seg__opt,
+.menu__item,
+.palette__item {
+  transition:
+    background-color var(--dur-hover) ease,
+    color var(--dur-hover) ease,
+    scale var(--dur-pop) var(--ease-out);
+}
+.btn:active:not(:disabled):not([aria-disabled="true"]),
+.btn[data-pressed]:not(:disabled):not([aria-disabled="true"]) {
+  scale: var(--press-scale);
+  transition-duration: var(--dur-hover), var(--dur-hover), var(--dur-press);
+}
+
+.switch,
+.switch::before {
+  transition: background-color var(--dur-hover) ease, translate var(--dur-panel) var(--ease-in-out);
+}
+
+/* ---------------------------------------------------------------- popups */
+
+/* Menus and popovers grow from the side that faces their trigger
+   (transform-origin is written by ns.ui from the placement). */
+.menu,
+.popover {
+  transform-origin: var(--origin, top left);
+  transition:
+    opacity var(--dur-pop) var(--ease-out),
+    scale var(--dur-pop) var(--ease-out),
+    display var(--dur-pop) allow-discrete;
+}
+.menu[hidden],
+.popover[hidden] {
+  opacity: 0;
+  scale: var(--pop-scale);
+  pointer-events: none;
+  transition-duration: calc(var(--dur-pop) * 0.75);
+}
+@starting-style {
+  .menu,
+  .popover {
+    opacity: 0;
+    scale: var(--pop-scale);
+  }
+}
+/* A menu inside a bottom sheet travels with the sheet. */
+.menu--sheet { transition: none; }
+
+/* The first tooltip waits (the delay is in ui.js) and fades; the next ones,
+   within a second, appear at once. */
+.tooltip {
+  transition: opacity var(--dur-tooltip) ease, display var(--dur-tooltip) allow-discrete;
+}
+.tooltip[hidden] { opacity: 0; }
+.tooltip[data-instant] { transition: none; }
+@starting-style {
+  .tooltip { opacity: 0; }
+}
+
+/* ---------------------------------------------------------------- toasts, banners */
+
+.toast {
+  transition:
+    opacity var(--dur-toast) ease,
+    translate var(--dur-toast) var(--ease-out),
+    display var(--dur-toast) allow-discrete;
+}
+.toast[hidden] {
+  opacity: 0;
+  translate: 0 100%;
+  pointer-events: none;
+  transition-duration: calc(var(--dur-toast) * 0.75);
+}
+@starting-style {
+  .toast {
+    opacity: 0;
+    translate: 0 100%;
+  }
+}
+/* At the top of the screen (over a bottom sheet, chrome.css) a toast comes
+   down from the edge it is nearest to, and leaves the same way. */
+.sheet[data-place="bottom"] > .toasts > .toast[hidden] { translate: 0 -100%; }
+@starting-style {
+  .sheet[data-place="bottom"] > .toasts > .toast {
+    opacity: 0;
+    translate: 0 -100%;
+  }
+}
+@media (max-width: 639px) {
+  html[data-viewer] #layers > .toasts > .toast[hidden] { translate: 0 -100%; }
+  @starting-style {
+    html[data-viewer] #layers > .toasts > .toast {
+      opacity: 0;
+      translate: 0 -100%;
+    }
+  }
+}
+/* A finger flicking it away moves it directly; a toast carried into a
+   modal that opened over it (or back out) does not enter a second time. */
+.toast[data-dragging],
+.toast[data-moved] { transition: none; }
+
+.banner {
+  transition:
+    opacity var(--dur-panel) var(--ease-out),
+    translate var(--dur-panel) var(--ease-out),
+    display var(--dur-panel) allow-discrete;
+}
+.banner[hidden] {
+  opacity: 0;
+  translate: 0 calc(-1 * var(--rise));
+  transition-duration: calc(var(--dur-panel) * 0.75);
+}
+@starting-style {
+  .banner {
+    opacity: 0;
+    translate: 0 calc(-1 * var(--rise));
+  }
+}
+
+/* ---------------------------------------------------------------- dialogs, sheets */
+
+/* Dialogs stay centred and only scale a little: a modal is a change of
+   context, not a thing travelling from somewhere. display and overlay keep
+   the closing dialog in the top layer while it fades (Chromium 117+). */
+.dialog,
+.sheet[data-place="center"],
+.palette {
+  transition:
+    opacity var(--dur-overlay) var(--ease-out),
+    scale var(--dur-overlay) var(--ease-out),
+    display var(--dur-overlay) allow-discrete,
+    overlay var(--dur-overlay) allow-discrete;
+}
+.dialog:not([open]),
+.sheet[data-place="center"]:not([open]) {
+  opacity: 0;
+  scale: var(--dialog-scale);
+  transition-duration: calc(var(--dur-overlay) * 0.75);
+}
+@starting-style {
+  .dialog[open],
+  .sheet[data-place="center"][open] {
+    opacity: 0;
+    scale: var(--dialog-scale);
+  }
+}
+/* The palette opens from the keyboard: it is simply there. */
+.palette { transition: none; }
+
+.sheet[data-place="bottom"] {
+  transition:
+    translate var(--dur-sheet) var(--ease-drawer),
+    display var(--dur-sheet) allow-discrete,
+    overlay var(--dur-sheet) allow-discrete;
+}
+.sheet[data-place="bottom"]:not([open]) {
+  translate: 0 100%;
+  transition-duration: calc(var(--dur-sheet) * 0.75);
+}
+@starting-style {
+  .sheet[data-place="bottom"][open] { translate: 0 100%; }
+}
+.sheet[data-place="bottom"][data-dragging] { transition: none; }
+/* Released by the finger: it glides on to the rest it was thrown at, height
+   and slide together, along the drawer curve. */
+.sheet[data-place="bottom"][data-settling] {
+  transition:
+    height var(--dur-sheet) var(--ease-drawer),
+    translate var(--dur-sheet) var(--ease-drawer);
+}
+
+.sheet[data-place="side"] {
+  transition:
+    opacity var(--dur-panel) var(--ease-out),
+    translate var(--dur-panel) var(--ease-out),
+    display var(--dur-panel) allow-discrete,
+    overlay var(--dur-panel) allow-discrete;
+}
+.sheet[data-place="side"]:not([open]) {
+  opacity: 0;
+  translate: var(--rise) 0;
+  transition-duration: calc(var(--dur-panel) * 0.75);
+}
+@starting-style {
+  .sheet[data-place="side"][open] {
+    opacity: 0;
+    translate: var(--rise) 0;
+  }
+}
+
+.dialog::backdrop,
+.sheet::backdrop,
+.palette::backdrop {
+  transition:
+    opacity var(--dur-overlay) ease,
+    display var(--dur-overlay) allow-discrete,
+    overlay var(--dur-overlay) allow-discrete;
+}
+.dialog:not([open])::backdrop,
+.sheet:not([open])::backdrop {
+  opacity: 0;
+}
+@starting-style {
+  .dialog[open]::backdrop,
+  .sheet[open]::backdrop { opacity: 0; }
+}
+.palette::backdrop { transition: none; }
+
+/* ---------------------------------------------------------------- shell */
+
+/* The drawer slides with the iOS drawer curve; while a finger holds it,
+   it follows the finger with no transition at all. */
+@media (max-width: 1023px) {
+  /* visibility flips at once on the way in (so focus can move into the
+     drawer on the same frame) and only after the slide on the way out. */
+  #sidebar {
+    transition:
+      translate var(--dur-drawer) var(--ease-drawer),
+      box-shadow var(--dur-drawer) ease,
+      visibility 0s linear var(--dur-drawer);
+  }
+  html[data-sidebar="open"] #sidebar {
+    transition:
+      translate var(--dur-drawer) var(--ease-drawer),
+      box-shadow var(--dur-drawer) ease,
+      visibility 0s linear 0s;
+  }
+  html[data-sidebar-drag] #sidebar { transition: none; }
+}
+
+/* Docked panels animate on the way in and not on the way out: holding the
+   map narrow for the length of an exit and then snapping it wide is worse to
+   watch than the snap alone. Column changes of the sidebar are instant for
+   the same reason. */
+
+#topbar,
+#thumbbar {
+  transition: opacity var(--dur-panel) var(--ease-out), display var(--dur-panel) allow-discrete;
+}
+@starting-style {
+  #topbar,
+  #thumbbar { opacity: 0; }
+}
+/* Leaving for view only, the bars fade over the time display is held for
+   them (allow-discrete), rather than standing still and then vanishing. */
+html[data-mode="view"] #topbar,
+html[data-mode="view"] #thumbbar { opacity: 0; }
+
+.view-exit {
+  transition: opacity var(--dur-panel) var(--ease-out), display var(--dur-panel) allow-discrete;
+}
+.view-exit[hidden] { opacity: 0; }
+@starting-style {
+  .view-exit { opacity: 0; }
+}
+
+#drop {
+  transition: opacity var(--dur-hover) ease, display var(--dur-hover) allow-discrete;
+}
+#drop[hidden] { opacity: 0; }
+@starting-style {
+  #drop { opacity: 0; }
+}
+
+.btn__badge { transition: scale var(--dur-pop) var(--ease-out); }
+.btn__badge[data-bump] { scale: 1.2; transition-duration: calc(var(--dur-pop) / 2); }
+
+/* The optional liquid-glass library puts transition: all on its own five
+   layers; used static, they have nothing to animate, and all is never
+   allowed here. The capsule inside keeps its buttons' own transitions. */
+.lg-root,
+.lg-root > *,
+.lg-stage > *,
+.lg-glass > * { transition: none !important; }
+
+/* The theme switch is one crossfade of the whole page (document.startViewTransition),
+   never a colour transition on every element. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-theme);
+  animation-timing-function: ease;
+}
+
+/* ---------------------------------------------------------------- reduced motion */
+
+/* Fewer and gentler: opacity crossfades of 120-150ms stay, travel and scale
+   go, and the drawer, sheets and toasts appear in place. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --rise: 0px;
+    --press-scale: 1;
+    --pop-scale: 1;
+    --dialog-scale: 1;
+    --dur-pop: 120ms;
+    --dur-panel: 150ms;
+    --dur-overlay: 150ms;
+    --dur-toast: 150ms;
+    --dur-sheet: 150ms;
+    --dur-drawer: 1ms;
+    --dur-map: 1ms;
+    --dur-camera: 1ms;
+  }
+  .sheet[data-place="bottom"] {
+    transition:
+      opacity var(--dur-sheet) ease,
+      display var(--dur-sheet) allow-discrete,
+      overlay var(--dur-sheet) allow-discrete;
+  }
+  .sheet[data-place="bottom"]:not([open]) { translate: none; opacity: 0; }
+  @starting-style {
+    .sheet[data-place="bottom"][open] { translate: none; opacity: 0; }
+  }
+  .toast[hidden] { translate: none; }
+  @starting-style {
+    .toast { translate: none; }
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation: none; }
+}
+/* The same, chosen by hand (data-motion="reduce" on <html>). */
+:root[data-motion="reduce"] {
+  --rise: 0px;
+  --press-scale: 1;
+  --pop-scale: 1;
+  --dialog-scale: 1;
+  --dur-pop: 120ms;
+  --dur-panel: 150ms;
+  --dur-overlay: 150ms;
+  --dur-toast: 150ms;
+  --dur-sheet: 150ms;
+  --dur-drawer: 1ms;
+  --dur-map: 1ms;
+  --dur-camera: 1ms;
+}
+:root[data-motion="reduce"] .sheet[data-place="bottom"] {
+  transition:
+    opacity var(--dur-sheet) ease,
+    display var(--dur-sheet) allow-discrete,
+    overlay var(--dur-sheet) allow-discrete;
+}
+:root[data-motion="reduce"] .sheet[data-place="bottom"]:not([open]) { translate: none; opacity: 0; }
+@starting-style {
+  :root[data-motion="reduce"] .sheet[data-place="bottom"][open] { translate: none; opacity: 0; }
+}
+:root[data-motion="reduce"] .toast[hidden] { translate: none; }
+@starting-style {
+  :root[data-motion="reduce"] .toast { translate: none; }
+}
+:root[data-motion="reduce"]::view-transition-old(root),
+:root[data-motion="reduce"]::view-transition-new(root) { animation: none; }

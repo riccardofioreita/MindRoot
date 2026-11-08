@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>core-ui</title>
+<link rel="stylesheet" href="../../css/tokens.css">
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/chrome.css">
+<link rel="stylesheet" href="../../css/motion.css">
+<style>#out { position: fixed; left: 0; bottom: 0; margin: 0; max-height: 30vh; overflow: auto; font-size: 9px; }</style>
+</head>
+<body>
+<pre id="out">LOADING</pre>
+<button type="button" id="anchor" style="position:fixed;left:200px;top:100px;width:60px;height:30px">menu</button>
+<button type="button" id="low" style="position:fixed;left:200px;bottom:10px;width:60px;height:30px">low</button>
+<div id="banners"></div>
+<div id="layers"></div>
+<script src="../../js/core/util.js"></script>
+<script src="../../js/core/i18n.js"></script>
+<script src="../../js/core/bus.js"></script>
+<script src="../../js/core/prefs.js"></script>
+<script src="../../js/core/ui.js"></script>
+<script src="../../js/core/float.js"></script>
+<script src="../../js/core/commands.js"></script>
+<script src="../harness.js"></script>
+<script src="core-ui.test.js"></script>
+<script>T.run();</script>
+</body>
+</html>

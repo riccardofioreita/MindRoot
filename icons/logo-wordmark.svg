@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 264 64" width="264" height="64" role="img" aria-label="MindRoot">
+<title>MindRoot</title>
+<g>
+<defs>
+<linearGradient id="g0" gradientUnits="userSpaceOnUse" x1="32.00" y1="15.00" x2="55.00" y2="9.00">
+<stop offset="0" stop-color="#3b6ea5"/>
+<stop offset="0.24" stop-color="#3b6ea5"/>
+<stop offset="0.5" stop-color="#437798"/>
+<stop offset="0.76" stop-color="#4a7f8a"/>
+<stop offset="1" stop-color="#4a7f8a"/>
+</linearGradient>
+<linearGradient id="g1" gradientUnits="userSpaceOnUse" x1="32.00" y1="32.00" x2="55.00" y2="9.00">
+<stop offset="0" stop-color="#c2703d"/>
+<stop offset="0.24" stop-color="#c2703d"/>
+<stop offset="0.5" stop-color="#95786c"/>
+<stop offset="0.76" stop-color="#4a7f8a"/>
+<stop offset="1" stop-color="#4a7f8a"/>
+</linearGradient>
+<linearGradient id="g2" gradientUnits="userSpaceOnUse" x1="32.00" y1="32.00" x2="55.00" y2="32.00">
+<stop offset="0" stop-color="#c2703d"/>
+<stop offset="0.24" stop-color="#c2703d"/>
+<stop offset="0.5" stop-color="#9a7e3e"/>
+<stop offset="0.76" stop-color="#5f8a3f"/>
+<stop offset="1" stop-color="#5f8a3f"/>
+</linearGradient>
+<linearGradient id="g3" gradientUnits="userSpaceOnUse" x1="32.00" y1="32.00" x2="55.00" y2="55.00">
+<stop offset="0" stop-color="#c2703d"/>
+<stop offset="0.24" stop-color="#c2703d"/>
+<stop offset="0.5" stop-color="#b67a3e"/>
+<stop offset="0.76" stop-color="#a8843f"/>
+<stop offset="1" stop-color="#a8843f"/>
+</linearGradient>
+<linearGradient id="g4" gradientUnits="userSpaceOnUse" x1="32.00" y1="49.00" x2="55.00" y2="55.00">
+<stop offset="0" stop-color="#b4485f"/>
+<stop offset="0.24" stop-color="#b4485f"/>
+<stop offset="0.5" stop-color="#ae6b51"/>
+<stop offset="0.76" stop-color="#a8843f"/>
+<stop offset="1" stop-color="#a8843f"/>
+</linearGradient>
+<linearGradient id="g5" gradientUnits="userSpaceOnUse" x1="11.00" y1="32.00" x2="32.00" y2="15.00">
+<stop offset="0" stop-color="#2f7d5a"/>
+<stop offset="0.24" stop-color="#2f7d5a"/>
+<stop offset="0.5" stop-color="#357686"/>
+<stop offset="0.76" stop-color="#3b6ea5"/>
+<stop offset="1" stop-color="#3b6ea5"/>
+</linearGradient>
+<linearGradient id="g6" gradientUnits="userSpaceOnUse" x1="11.00" y1="32.00" x2="32.00" y2="32.00">
+<stop offset="0" stop-color="#2f7d5a"/>
+<stop offset="0.24" stop-color="#2f7d5a"/>
+<stop offset="0.5" stop-color="#90774d"/>
+<stop offset="0.76" stop-color="#c2703d"/>
+<stop offset="1" stop-color="#c2703d"/>
+</linearGradient>
+<linearGradient id="g7" gradientUnits="userSpaceOnUse" x1="11.00" y1="32.00" x2="32.00" y2="49.00">
+<stop offset="0" stop-color="#2f7d5a"/>
+<stop offset="0.24" stop-color="#2f7d5a"/>
+<stop offset="0.5" stop-color="#86675d"/>
+<stop offset="0.76" stop-color="#b4485f"/>
+<stop offset="1" stop-color="#b4485f"/>
+</linearGradient>
+</defs>
+<g fill="none" stroke-linecap="round">
+<path d="M32.00,15.00 C43.50,15.00 43.50,9.00 55.00,9.00" stroke="url(#g0)" stroke-width="2.00"/>
+<path d="M32.00,32.00 C43.50,32.00 43.50,9.00 55.00,9.00" stroke="url(#g1)" stroke-width="2.00"/>
+<path d="M32.00,32.00 C43.50,32.00 43.50,32.00 55.00,32.00" stroke="url(#g2)" stroke-width="2.00"/>
+<path d="M32.00,32.00 C43.50,32.00 43.50,55.00 55.00,55.00" stroke="url(#g3)" stroke-width="2.00"/>
+<path d="M32.00,49.00 C43.50,49.00 43.50,55.00 55.00,55.00" stroke="url(#g4)" stroke-width="2.00"/>
+<path d="M11.00,32.00 C21.50,32.00 21.50,15.00 32.00,15.00" stroke="url(#g5)" stroke-width="2.60"/>
+<path d="M11.00,32.00 C21.50,32.00 21.50,32.00 32.00,32.00" stroke="url(#g6)" stroke-width="2.60"/>
+<path d="M11.00,32.00 C21.50,32.00 21.50,49.00 32.00,49.00" stroke="url(#g7)" stroke-width="2.60"/>
+</g>
+<circle cx="11.00" cy="32.00" r="5.00" fill="#2f7d5a"/>
+<circle cx="32.00" cy="15.00" r="3.60" fill="#3b6ea5"/>
+<circle cx="32.00" cy="32.00" r="3.60" fill="#c2703d"/>
+<circle cx="32.00" cy="49.00" r="3.60" fill="#b4485f"/>
+<circle cx="55.00" cy="9.00" r="2.90" fill="#4a7f8a"/>
+<circle cx="55.00" cy="32.00" r="2.90" fill="#5f8a3f"/>
+<circle cx="55.00" cy="55.00" r="2.90" fill="#a8843f"/>
+</g>
+<style>
+.wm{fill:#15171d}
+@media (prefers-color-scheme:dark){.wm{fill:#e4e6ea}}
+</style>
+<text class="wm" x="80" y="41.5" font-family="Montserrat, Segoe UI, system-ui, sans-serif" font-size="30" font-weight="620" letter-spacing="-0.7">MindRoot</text>
+</svg>

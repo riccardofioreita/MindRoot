@@ -1,0 +1,959 @@
+/* MindRoot - the map surface: nodes, links, stubs, knobs, the selection
+ * halo, note dots and cards, and the drag feedback (js/map/mapview.js).
+ *
+ * The map's own measures are named once, here, on .mv, from the shared
+ * tokens where one exists; box measures are in px (not rem) because a map
+ * box is laid out in map units the export repeats, whatever the reader's
+ * text size (the words under a title take the type scale's rem sizes). Node boxes are measured by the view with offsetWidth/offsetHeight,
+ * so everything that changes a box's size must be decided by a class or
+ * attribute present before measuring, never by :hover or a transition.
+ * Boxes are shrink-to-fit (width: max-content) up to the column the room
+ * class allows: 320 px of words, or 480 / 240 / 720 with pictures beside,
+ * above, or a pair beside (the export uses the same numbers). Text sizes on
+ * the map are relative to --map-fs, never to the chrome's own size.
+ *
+ * Each node sits in a bare .mv-pos box that carries only its place (left,
+ * top, an opacity, a scale while it grows in, written by the view): moving
+ * it restyles one element no rule here matches, not the node and its
+ * children. It contains its size and layout (it is 0 x 0; the node inside
+ * overflows it, drawn and hit as usual), so the words typed into one node
+ * lay out that node alone, whatever the size of the map. Stubs and
+ * links are SVG paths drawn by the view in the same frame as the boxes.
+ * Nothing on the map moves through CSS except the lifted drag copy. */
+
+/* The measures, also on the lifted copy, which lives outside the map. */
+.mv,
+.mv-ghost-host,
+.mv-ghost {
+  /* the box of a node */
+  --mv-pad-x: 12px;           /* also PAD_X in mapview.js: how far into a box a knob reaches */
+  --mv-pad-top: 2px;
+  --mv-pad-bottom: 3px;       /* the stub is 2px thick, centred 1px under the title: kept inside the box */
+  --mv-text: 320px;
+  --mv-room-col: 240px;
+  --mv-room-row: 480px;
+  --mv-room-pair: 720px;
+  --mv-room-trio: 960px;
+  --mv-gap: 0.45em;
+  --mv-body-gap: 6px;         /* padding, not margin: the gap under the stub is inside the measured box */
+  --mv-fw-heavy: 800;         /* strong words inside an already bold title */
+  --mv-r-inline: 4px;         /* inline code and the task box: smaller than a chip */
+  --mv-border: 1px;           /* hairline frames: pictures, cards */
+  --mv-empty-w: 3em;          /* an empty line still has something to tap */
+  --mv-task: 0.95em;          /* the task box, as tall as a capital */
+  --mv-code: 0.88em;          /* monospace reads larger than Montserrat */
+  --mv-code-pad: 0.25em;
+  --mv-underline: 1px;
+  --mv-underline-gap: 0.15em;
+  /* pictures */
+  --mv-img: 220px;
+  --mv-img-margin: 3px;
+  --mv-gap-pics: 10px;
+  --mv-gap-above: 4px;
+  --mv-broken-w: 180px;
+  --mv-broken-h: 54px;
+  /* lines, knobs, the halo */
+  --mv-line: 2px;
+  --mv-hairline: 1.5px;
+  --mv-knob-hover: 2.5px;
+  /* notes, tasks */
+  --mv-task-border: 1.5px;
+  --mv-list-gap: 0.2em;       /* lists in the words under a title */
+  --mv-list-step: 1.15em;
+  --mv-list-mark-gap: 0.45em;
+  --mv-list-dot: 0.4em;
+  --mv-list-box: 0.9em;
+  --mv-dot: 10px;
+  --mv-edge-dot: 18px;
+  --mv-edge-inset: 3.5px;
+  --mv-reach: 6px;            /* extra target around a small control, outside its box */
+  --mv-reach-edge: 4px;
+  --mv-card-w: 256px;
+  --mv-card-lines: 5;
+  --mv-card-gap: 6px;
+  --mv-card-pad-y: 4px;
+  --mv-card-pad-x: 8px;
+  --mv-card-rule: 3px;
+  /* dragging */
+  --mv-drop-ring: 2px;
+  --mv-drop-dot: 8px;
+  --mv-lift: 1.02;
+  --mv-grip: 22px;            /* the move grip of the selected node, on screen */
+  --mv-grip-icon: 14px;
+}
+
+.mv {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-map, 0);
+  overflow: hidden;
+  contain: strict;
+  outline: none;
+  /* The empty map is something to take hold of and move; the nodes on it
+     keep the arrow (below). Set once and never toggled, so it costs no
+     restyle; the grabbing hand of a pan is on the shield. */
+  cursor: grab;
+  /* The map does its own panning and pinching; the page never scrolls or
+     zooms underneath, and a long press never opens the iOS callout. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fingers get bigger reach around the small controls inside a box. */
+@media (pointer: coarse) {
+  .mv,
+  .mv-ghost-host,
+  .mv-ghost {
+    --mv-reach: 12px;
+    --mv-reach-edge: 10px;
+    --mv-grip: 30px;
+    --mv-grip-icon: 18px;
+  }
+}
+
+/* Inside the edge, because the stage clips anything drawn outside it; an
+   outline, because it paints over the map's own content. */
+.mv:focus-visible {
+  outline: var(--mv-line) solid var(--focus, #2f7d5a);
+  outline-offset: calc(-1 * var(--mv-line));
+}
+/* On a touch screen the focus comes back to the map after every name typed
+   on the on-screen keyboard, which the browser counts as keyboard use: a
+   frame round the whole screen each time. The editor marks that focus
+   data-quiet-focus (only after a finger or a pen, and only until a real key
+   is pressed outside a text field), so a keyboard on a tablet keeps its
+   frame. The selected node already shows where the keys go. */
+.mv[data-quiet-focus]:focus-visible { outline: none; }
+/* With a node selected (the tree names it as its active descendant) the
+   node's own ring already shows where the keys go: a second frame round the
+   whole map would sit on screen for the whole time a map is built from the
+   keyboard. The frame is for a map that has the keys and nothing selected. */
+.mv[aria-activedescendant]:focus-visible { outline: none; }
+
+/* Shown only while a pointer pans (see mapview: a cursor set on the root
+   would be inherited by, and restyle, every node). */
+.mv-shield {
+  position: absolute;
+  inset: 0;
+  cursor: grabbing;
+}
+
+.mv-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+/* Sized by the view to the map's bounds; base.css caps every svg at its
+   container's width, and the layer is 0 wide. Only the knob targets take
+   pointers. */
+.mv-under,
+.mv-over {
+  position: absolute;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mv-nodes,
+.mv-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+/* ---------------------------------------------------------------- nodes */
+
+/* A node's place: the view writes its transform and opacity and nothing
+   else, and scales it about its parent's side inside the transform. */
+.mv-pos {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  contain: size layout;
+}
+
+.mv-node {
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(var(--mv-text) + 2 * var(--mv-pad-x));
+  margin: 0;
+  padding: var(--mv-pad-top) var(--mv-pad-x) var(--mv-pad-bottom);
+  font-family: var(--font-map, "Montserrat", system-ui, sans-serif);
+  font-size: var(--map-fs, 15px);
+  font-weight: var(--fw-regular, 400);
+  line-height: var(--lh-snug, 1.35);
+  letter-spacing: normal;
+  color: var(--ink, #15171c);
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  cursor: var(--mr-cursor, default);
+}
+
+.mv-node--col { max-width: calc(var(--mv-room-col) + 2 * var(--mv-pad-x)); }
+.mv-node--row { max-width: calc(var(--mv-room-row) + 2 * var(--mv-pad-x)); }
+.mv-node--pair { max-width: calc(var(--mv-room-pair) + 2 * var(--mv-pad-x)); }
+.mv-node--trio { max-width: calc(var(--mv-room-trio) + 2 * var(--mv-pad-x)); }
+
+/* The scale by depth (the map's type ratios on --map-fs). */
+.mv-d0 {
+  font-size: calc(var(--map-fs, 15px) * 1.6);
+  font-weight: var(--fw-bold, 700);
+  letter-spacing: var(--tr-display, -0.015em);
+}
+.mv-d1 {
+  font-size: calc(var(--map-fs, 15px) * 1.34);
+  font-weight: var(--fw-bold, 700);
+  letter-spacing: var(--tr-title, -0.01em);
+}
+.mv-d2 {
+  font-size: calc(var(--map-fs, 15px) * 1.12);
+  font-weight: var(--fw-semibold, 600);
+}
+.mv-d3 {
+  font-size: var(--map-fs, 15px);
+  font-weight: var(--fw-medium, 500);
+}
+
+/* A title size written in the file wins over the depth: it is what the
+   line was asked to be. h2 and h3 keep the sizes the old title / subtitle
+   roles had, so older maps open looking like themselves. */
+.mv-node.mv-h1 { font-size: calc(var(--map-fs, 15px) * 1.6); font-weight: var(--fw-bold, 700); letter-spacing: var(--tr-display, -0.015em); }
+.mv-node.mv-h2 { font-size: calc(var(--map-fs, 15px) * 1.34); font-weight: var(--fw-bold, 700); letter-spacing: var(--tr-title, -0.01em); }
+.mv-node.mv-h3 { font-size: calc(var(--map-fs, 15px) * 1.12); font-weight: var(--fw-semibold, 600); letter-spacing: normal; }
+.mv-node.mv-h4 { font-size: var(--map-fs, 15px); font-weight: var(--fw-semibold, 600); letter-spacing: normal; }
+.mv-node.mv-h5 { font-size: calc(var(--map-fs, 15px) * 0.9); font-weight: var(--fw-semibold, 600); letter-spacing: normal; }
+/* Under a certain size a little air keeps a bold word from closing up. */
+.mv-node.mv-h6 { font-size: calc(var(--map-fs, 15px) * 0.82); font-weight: var(--fw-semibold, 600); letter-spacing: var(--tr-small, 0.01em); }
+
+/* A caption is held back by colour, not opacity: opacity would take the
+   branch tint under 4.5:1. */
+.mv-node.mv-caption {
+  font-size: calc(var(--map-fs, 15px) * 0.82);
+  font-weight: var(--fw-regular, 400);
+  letter-spacing: var(--tr-small, 0.01em);
+}
+.mv-node.mv-caption .mv-title { color: var(--ink-soft, #545a66); }
+
+/* Branch-coloured words (a setting). Mixed 78% toward the ink, in oklab:
+   every palette colour then clears 4.5:1 on paper in both themes, and the
+   branch still reads as its own colour. The first declaration is the plain
+   fallback for an engine without color-mix(). */
+.mv--branch-text .mv-node,
+.mv-ghost--tint {
+  color: var(--branch, var(--ink, #15171c));
+  color: color-mix(in oklab, var(--branch, var(--ink, #15171c)) 78%, var(--ink, #15171c));
+}
+.mv--branch-text .mv-node.mv-caption .mv-title,
+.mv-ghost--tint.mv-caption .mv-title {
+  color: var(--ink-soft, #545a66);
+  color: color-mix(in oklab, var(--branch, var(--ink-soft, #545a66)) 50%, var(--ink-soft, #545a66));
+}
+
+.mv-node--leaving { pointer-events: none; }
+.mv-node--dragging { opacity: 0.35; }
+
+/* ---------------------------------------------------------------- inside a box */
+
+.mv-title,
+.mv-body { display: block; }
+
+.mv-line {
+  display: flex;
+  align-items: center;
+  gap: var(--mv-gap);
+}
+
+.mv-text,
+.mv-body-text {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* An empty line still has a box to tap and a place for the stub. */
+.mv-text--empty {
+  min-width: var(--mv-empty-w);
+  min-height: calc(1em * var(--lh-snug, 1.35));
+}
+
+.mv-num {
+  flex: none;
+  align-self: flex-start;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft, #545a66);
+}
+
+/* The words under the title: their own voice whatever size the title is
+   written at, so sized in rem, not em. */
+.mv-body {
+  padding-top: var(--mv-body-gap);
+  font-size: var(--fs-sm, 0.8125rem);
+  font-weight: var(--fw-regular, 400);
+  line-height: var(--lh-body, 1.5);
+  letter-spacing: normal;
+}
+.mv-body.mv-role--title {
+  font-size: var(--fs-lg, 1.125rem);
+  font-weight: var(--fw-bold, 700);
+  line-height: var(--lh-snug, 1.35);
+  letter-spacing: var(--tr-title, -0.01em);
+}
+.mv-body.mv-role--subtitle {
+  font-size: var(--fs-md, 0.9375rem);
+  font-weight: var(--fw-semibold, 600);
+  line-height: var(--lh-snug, 1.35);
+}
+.mv-body.mv-role--caption {
+  font-size: var(--fs-xs, 0.75rem);
+  color: var(--ink-soft, #545a66);
+}
+
+.mv-node strong { font-weight: var(--fw-bold, 700); }
+.mv-d0 strong,
+.mv-d1 strong,
+.mv-h1 strong,
+.mv-h2 strong { font-weight: var(--mv-fw-heavy); }
+
+.mv-node code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--mv-code);
+  padding: 0 var(--mv-code-pad);
+  border-radius: var(--mv-r-inline);
+  background: var(--paper-sunken, #f3f4f6);
+}
+
+.mv-node .md-code {
+  display: block;
+  margin: var(--mv-line) 0;
+  padding: var(--mv-card-pad-y) var(--mv-body-gap);
+  white-space: pre-wrap;
+  border-radius: var(--r-chip, 6px);
+}
+
+/* Highlighted words are written in the plain ink: a branch's tint on the
+   highlight ground falls under 4.5:1 in the dark theme. */
+.mv-node mark {
+  color: var(--ink, #15171c);
+  background: var(--selection, rgb(47 125 90 / 0.22));
+  border-radius: var(--mv-line);
+}
+
+.mv-node .md-quote {
+  font-style: italic;
+  color: var(--ink-soft, #545a66);
+}
+
+.mv-node .md-table { font-variant-numeric: tabular-nums; }
+.mv-node .md-sep { color: var(--ink-faint, #6b717c); }
+
+/* Lists in the words under a title: one line per item, nested by a step
+   of indent, the mark in the soft ink so the words lead. A task box is the
+   node's own task box at the body's size, and ticks the same way. */
+.mv-node .md-list {
+  display: block;
+  margin: var(--mv-list-gap) 0;
+}
+.mv-node .md-li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mv-list-mark-gap);
+  padding-inline-start: calc(var(--mv-list-step) * var(--mv-list-depth, 0));
+}
+.mv-node .md-li--1 { --mv-list-depth: 1; }
+.mv-node .md-li--2 { --mv-list-depth: 2; }
+.mv-node .md-li--3 { --mv-list-depth: 3; }
+.mv-node .md-li--4 { --mv-list-depth: 4; }
+.mv-node .md-li--5 { --mv-list-depth: 5; }
+.mv-node .md-li-text { flex: 0 1 auto; min-width: 0; }
+.mv-node .md-li-dot {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--mv-list-dot);
+  height: var(--mv-list-dot);
+  /* Sits on the middle of the first line's x-height. */
+  transform: translateY(-0.18em);
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+.mv-node .md-li--1 .md-li-dot,
+.mv-node .md-li--3 .md-li-dot,
+.mv-node .md-li--5 .md-li-dot { background: transparent; border: var(--mv-task-border) solid currentColor; }
+.mv-node .md-li--2 .md-li-dot,
+.mv-node .md-li--4 .md-li-dot { border-radius: 1px; }
+.mv-node .md-li-num {
+  flex: none;
+  min-width: 1.1em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft, #545a66);
+}
+.mv-node .md-check {
+  position: relative;
+  flex: none;
+  align-self: center;
+  box-sizing: border-box;
+  width: var(--mv-list-box);
+  height: var(--mv-list-box);
+  border: var(--mv-task-border) solid var(--line-control, #8a909b);
+  border-radius: var(--mv-r-inline);
+  background: var(--paper-raised, #fff);
+  cursor: var(--mr-cursor, pointer);
+}
+.mv-node .md-check[aria-checked="true"] {
+  border-color: var(--accent, #2f7d5a);
+  background: var(--accent, #2f7d5a);
+}
+.mv-node .md-check[aria-checked="true"]::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  top: 8%;
+  width: 28%;
+  height: 56%;
+  border: solid var(--on-accent, #fff);
+  border-width: 0 var(--mv-line) var(--mv-line) 0;
+  transform: rotate(45deg);
+}
+.mv-node .md-li--done .md-li-text {
+  color: var(--ink-soft, #545a66);
+  text-decoration: line-through;
+}
+.mv--readonly .md-check { cursor: var(--mr-cursor, default); }
+
+/* A picture picked by a click: Delete takes it out of its node (not the
+   branch), so the ring says which one it will be. */
+.mv-img[data-picked] {
+  outline: var(--mv-line, 2px) solid var(--focus, #2f7d5a);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.mv-node a {
+  color: var(--accent-ink, #2a6f50);
+  text-decoration: underline;
+  text-decoration-thickness: var(--mv-underline);
+  text-decoration-color: color-mix(in oklab, var(--accent-ink, #2a6f50) 45%, transparent);
+  text-underline-offset: var(--mv-underline-gap);
+  cursor: pointer; /* a link keeps the hand: it leaves the map */
+  -webkit-user-drag: none;
+}
+.mv-node a.md-map { text-decoration-style: dotted; }
+
+.mv-node--done .mv-text {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, currentColor 55%, transparent);
+}
+
+/* ---------------------------------------------------------------- pictures */
+
+.mv-pics {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--mv-gap-pics);
+}
+.mv-pics--above { margin-bottom: var(--mv-gap-above); }
+
+/* A fixed width keeps a box stable while its picture decodes; the height
+   follows the picture, and the view measures again once it has. */
+.mv-img {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--mv-img);
+  max-width: none;
+  height: auto;
+  margin: var(--mv-img-margin) 0;
+  border: var(--mv-border) solid var(--line, #e3e5ea);
+  border-radius: var(--r-chip, 6px);
+  background: var(--paper-raised, #fff);
+  -webkit-user-drag: none;
+}
+
+.mv-img[data-broken="true"] {
+  width: var(--mv-broken-w);
+  height: var(--mv-broken-h);
+  padding: var(--mv-card-pad-y) var(--mv-body-gap);
+  overflow: hidden;
+  font: var(--fw-regular, 400) var(--fs-xs, 0.75rem) / var(--lh-snug, 1.35) var(--font-ui, system-ui, sans-serif);
+  color: var(--ink-soft, #545a66);
+  border-style: dashed;
+  border-color: var(--danger, #b4485f);
+}
+
+/* ---------------------------------------------------------------- tasks and notes */
+
+.mv-task {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--mv-task);
+  height: var(--mv-task);
+  border: var(--mv-task-border) solid var(--line-control, #8a909b);
+  border-radius: var(--mv-r-inline);
+  background: var(--paper-raised, #fff);
+  cursor: var(--mr-cursor, pointer);
+}
+.mv-task[aria-checked="true"] {
+  border-color: var(--accent, #2f7d5a);
+  background: var(--accent, #2f7d5a);
+}
+.mv-task[aria-checked="true"]::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  top: 8%;
+  width: 28%;
+  height: 56%;
+  border: solid var(--on-accent, #fff);
+  border-width: 0 var(--mv-line) var(--mv-line) 0;
+  transform: rotate(45deg);
+}
+.mv--readonly .mv-task { cursor: var(--mr-cursor, default); }
+
+/* The note dot rides inside the box, so the box is measured with it. Its
+   colour is the note colour, which no branch may come near. */
+.mv-note-dot {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--mv-dot);
+  height: var(--mv-dot);
+  margin: 0;
+  padding: 0;
+  border: var(--mv-hairline) solid var(--note, #8a5fbf);
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--note, #8a5fbf) 22%, transparent);
+  cursor: var(--mr-cursor, pointer);
+}
+
+/* Bigger targets, without changing the measured box. */
+.mv-task::before,
+.mv-note-dot::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--mv-reach));
+  border-radius: 50%;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mv-note-dot:hover { background: var(--note, #8a5fbf); }
+  .mv-edge-dot:hover { border-width: var(--mv-line); }
+}
+
+/* The dot of a note on a link, at the curve's midpoint, in map space (it
+   pans and zooms with the map; the transform holds the position, the
+   margins centre it). */
+.mv-edge-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  width: var(--mv-edge-dot);
+  height: var(--mv-edge-dot);
+  margin: calc(var(--mv-edge-dot) / -2) 0 0 calc(var(--mv-edge-dot) / -2);
+  padding: 0;
+  border: var(--mv-hairline) solid var(--note, #8a5fbf);
+  border-radius: 50%;
+  background: var(--paper, #fbfbfc);
+  cursor: var(--mr-cursor, pointer);
+}
+.mv-edge-dot::after {
+  content: "";
+  position: absolute;
+  inset: var(--mv-edge-inset);
+  border-radius: 50%;
+  background: var(--note, #8a5fbf);
+}
+.mv-edge-dot::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--mv-reach-edge));
+  border-radius: 50%;
+}
+.mv-edge-dot.is-leaving,
+.mv-card--edge.is-leaving { pointer-events: none; }
+
+/* Every note open: the node's card is part of its box (measured, so the
+   layout makes room), the link's card stands on the curve's midpoint. */
+.mv-card {
+  box-sizing: border-box;
+  max-width: var(--mv-card-w);
+  margin: var(--mv-card-gap) 0 0;
+  padding: var(--mv-card-pad-y) var(--mv-card-pad-x);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--mv-card-lines);
+  font: var(--fw-regular, 400) var(--fs-xs, 0.75rem) / var(--lh-snug, 1.35) var(--font-ui, system-ui, sans-serif);
+  letter-spacing: normal;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--ink-soft, #545a66);
+  background: var(--paper-raised, #fff);
+  border: var(--mv-border) solid var(--line-strong, #c6cad2);
+  border-left: var(--mv-card-rule) solid var(--note, #8a5fbf);
+  border-radius: var(--r-chip, 6px);
+  cursor: var(--mr-cursor, pointer);
+}
+
+.mv-card--edge {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max-content;
+  margin: 0;
+  translate: -50% -50%;
+  font-style: italic;
+  border-left-style: dashed;
+}
+
+/* ---------------------------------------------------------------- links, stubs, knobs, halo */
+
+/* Stubs and links share paths (one per colour at rest), so they share the
+   line: the stub's round ends reach a pixel past its box, as the old map's
+   did. */
+.mv-link {
+  fill: none;
+  stroke-width: var(--mv-line);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mv-knob-dot {
+  fill: var(--paper, #fbfbfc);
+  stroke: var(--branch, var(--ink-soft, #545a66));
+  stroke-width: var(--mv-hairline);
+}
+.mv-knob.is-folded .mv-knob-dot { fill: var(--branch, var(--ink-soft, #545a66)); }
+
+/* The knob's targets, sized by the view to keep their size on screen: the
+   one above the words reaches only into the box's side padding, the one
+   beneath them covers the rest of the circle. */
+.mv-knob-tap,
+.mv-knob-hit {
+  fill: transparent;
+  pointer-events: all;
+  cursor: var(--mr-cursor, pointer);
+}
+.mv-knob.is-leaving .mv-knob-tap { pointer-events: none; }
+@media (hover: hover) and (pointer: fine) {
+  .mv-knob:hover .mv-knob-dot { stroke-width: var(--mv-knob-hover); }
+}
+
+/* The selection: a rounded, softly filled frame under the words. The stroke
+   keeps its width at any zoom. */
+.mv-halo {
+  fill: var(--accent-soft, rgb(47 125 90 / 0.10));
+  stroke: var(--accent, #2f7d5a);
+  stroke-width: var(--mv-hairline);
+  vector-effect: non-scaling-stroke;
+}
+
+/* ---------------------------------------------------------------- dragging a node */
+
+.mv-node--drop {
+  border-radius: var(--r-control, 8px);
+  background: var(--accent-soft, rgb(47 125 90 / 0.10));
+  box-shadow: 0 0 0 var(--mv-drop-ring) var(--accent, #2f7d5a);
+}
+/* Dropped onto a root, a branch grows on the side the pointer is on: that
+   side of the root is marked with a thicker edge (the dashed link says it
+   again, pointing the way the branch will grow). */
+.mv-node--drop[data-drop-side="left"] { box-shadow: 0 0 0 var(--mv-drop-ring) var(--accent, #2f7d5a), inset calc(var(--mv-drop-ring) * 2) 0 0 var(--accent, #2f7d5a); }
+.mv-node--drop[data-drop-side="right"] { box-shadow: 0 0 0 var(--mv-drop-ring) var(--accent, #2f7d5a), inset calc(var(--mv-drop-ring) * -2) 0 0 var(--accent, #2f7d5a); }
+
+/* The move grip of the selected node, at its outer top corner: pulled, it
+   lifts the branch (to another node, beside one, or onto the empty map).
+   One size on screen at any zoom (the view scales it back); a finger gets
+   a wider reach around it. Not drawn while the node is written in or
+   while a node is dragged. It follows the selection without motion: the
+   selection moves by arrow keys too. */
+.mv-grip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  width: var(--mv-grip);
+  height: var(--mv-grip);
+  display: grid;
+  place-items: center;
+  transform-origin: 0 0;
+  border: var(--mv-border, 1px) solid var(--line-strong, #c6cad2);
+  border-radius: 50%;
+  color: var(--ink-soft, #545a66);
+  background: var(--paper-raised, #fff);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(20 22 28 / 0.08));
+  cursor: grab;
+  touch-action: none;
+  transition: color var(--dur-hover, 120ms) ease, border-color var(--dur-hover, 120ms) ease, background-color var(--dur-hover, 120ms) ease;
+}
+.mv-grip[hidden] { display: none; }
+.mv-grip::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--mv-reach));
+  border-radius: 50%;
+}
+.mv-grip .icon { width: var(--mv-grip-icon); height: var(--mv-grip-icon); }
+@media (hover: hover) and (pointer: fine) {
+  .mv-grip:hover { color: var(--accent, #2f7d5a); border-color: var(--accent, #2f7d5a); background: var(--accent-soft, rgb(47 125 90 / 0.10)); }
+}
+html[data-node-drag] .mv-grip,
+.mv:has(.mv-node--editing) .mv-grip { display: none; }
+
+/* The threads of the selected node: 'in' sits on the thread that holds it
+   to its parent, 'out' under the grip. Pulled, a thread follows the pointer
+   (.mv-thread, with a plug at its loose end) and the node it would join is
+   lit like a drop target. Same size on screen at any zoom as the grip. */
+.mv-wire {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  width: var(--mv-grip);
+  height: var(--mv-grip);
+  display: grid;
+  place-items: center;
+  transform-origin: 0 0;
+  border: var(--mv-border, 1px) dashed var(--line-strong, #c6cad2);
+  border-radius: 50%;
+  color: var(--ink-soft, #545a66);
+  background: var(--paper-raised, #fff);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(20 22 28 / 0.08));
+  cursor: crosshair;
+  touch-action: none;
+}
+.mv-wire[hidden] { display: none; }
+.mv-wire::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--mv-reach));
+  border-radius: 50%;
+}
+.mv-wire .icon { width: var(--mv-grip-icon); height: var(--mv-grip-icon); }
+@media (hover: hover) and (pointer: fine) {
+  .mv-wire:hover { color: var(--accent, #2f7d5a); border-color: var(--accent, #2f7d5a); background: var(--accent-soft, rgb(47 125 90 / 0.10)); }
+}
+html[data-node-drag] .mv-wire,
+.mv:has(.mv-node--editing) .mv-wire { display: none; }
+
+.mv-thread {
+  fill: none;
+  stroke: var(--branch, var(--accent, #2f7d5a));
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 7 5;
+  pointer-events: none;
+}
+.mv-thread.is-free { stroke-dasharray: 2 6; opacity: 0.8; }
+.mv-thread.is-refused { stroke: var(--danger, #b3402f); }
+.mv-thread-plug {
+  fill: var(--paper-raised, #fff);
+  stroke: var(--branch, var(--accent, #2f7d5a));
+  stroke-width: 2.5;
+  pointer-events: none;
+}
+.mv-drop-chip.mv-thread-chip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* Where the branch will hang, before it is let go: the link it will grow
+   from, dashed in the colour it will take, and the place it will stand.
+   The place glides from one candidate to the next (where it went is the
+   point), the link is redrawn at once. */
+.mv-drop-link {
+  fill: none;
+  stroke: var(--branch, var(--accent, #2f7d5a));
+  stroke-width: var(--mv-line);
+  stroke-dasharray: 5 5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.mv-drop-slot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  border: var(--mv-line) dashed var(--branch, var(--accent, #2f7d5a));
+  border-radius: var(--r-control, 8px);
+  background: color-mix(in oklab, var(--branch, var(--accent, #2f7d5a)) 10%, transparent);
+  pointer-events: none;
+  transition:
+    transform var(--dur-map, 220ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    opacity var(--dur-hover, 120ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    display var(--dur-hover, 120ms) allow-discrete;
+}
+.mv-drop-slot[hidden] { display: none; opacity: 0; }
+@starting-style { .mv-drop-slot:not([hidden]) { opacity: 0; } }
+.mv-drop-line--left::before { left: auto; right: calc(var(--mv-drop-dot) / -2); }
+
+/* The words under the lifted copy: what letting go will do. */
+.mv-drop-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin-top: var(--sp-2, 8px);
+  padding: var(--sp-1, 4px) var(--sp-2, 8px);
+  white-space: nowrap;
+  font: var(--fw-medium, 500) var(--fs-xs, 0.75rem) / 1.3 var(--font-ui, system-ui, sans-serif);
+  color: var(--on-accent, #fff);
+  background: var(--accent, #2f7d5a);
+  border-radius: var(--r-capsule, 999px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(20 22 28 / 0.08));
+  transition: opacity var(--dur-hover, 120ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), background-color var(--dur-hover, 120ms) ease;
+}
+.mv-drop-chip.is-refused { background: var(--ink-soft, #545a66); }
+@starting-style { .mv-drop-chip { opacity: 0; } }
+
+.mv-drop-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: var(--mv-line);
+  margin-top: calc(var(--mv-line) / -2);
+  border-radius: var(--mv-line);
+  background: var(--accent, #2f7d5a);
+  pointer-events: none;
+}
+.mv-drop-line::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--mv-drop-dot) / -2);
+  top: calc((var(--mv-drop-dot) - var(--mv-line)) / -2);
+  width: var(--mv-drop-dot);
+  height: var(--mv-drop-dot);
+  border-radius: 50%;
+  background: var(--accent, #2f7d5a);
+}
+
+/* The lifted copy lives on the body, above every layer, in screen space:
+   a host at the pointer (its place in translate, the lift in scale, both
+   about the pointer) holding the copy. The stub the map draws as SVG is
+   drawn under the copy's title here. */
+.mv-ghost-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: var(--z-drag, 90);
+  pointer-events: none;
+  transform-origin: 0 0;
+  transition: scale var(--dur-hover, 120ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.mv-ghost-host.is-lifted { scale: var(--mv-lift); }
+
+.mv-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  border-radius: var(--r-control, 8px);
+  background: var(--paper-raised, #fff);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(20 22 28 / 0.08));
+  transition:
+    box-shadow var(--dur-hover, 120ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    opacity var(--dur-hover, 120ms) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.mv-ghost--lift { box-shadow: var(--shadow-lift, 0 18px 40px rgb(20 22 28 / 0.16)); }
+.mv-ghost--over { opacity: 0.6; }
+.mv-ghost .mv-title { position: relative; }
+.mv-ghost .mv-title::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--mv-pad-x));
+  right: calc(-1 * var(--mv-pad-x));
+  bottom: calc(-1 * var(--mv-line));
+  height: var(--mv-line);
+  border-radius: var(--mv-line);
+  background: var(--branch, var(--line-strong, #c6cad2));
+}
+
+/* ---------------------------------------------------------------- accessibility fallbacks */
+
+/* Who wrote a node (doc.js 'by', AI window "Show who wrote each node"): a
+   small label on the box's top corner, out of the flow, so it changes no
+   size and no layout. html[data-ai-labels] is set by ai-ui.js, which also
+   fills the words in the app's language. While a node is written into
+   (html[data-ai-writing]) every label steps back: the keys then cost what
+   they cost without them, on a 2,000-node map too. AI: violet; mixed: half
+   violet, half paper; human: the quietest, a hairline. */
+html[data-ai-labels] .mv-by-ai:not(.mv-ghost),
+html[data-ai-labels] .mv-by-mixed:not(.mv-ghost),
+html[data-ai-labels] .mv-by-human:not(.mv-ghost) { position: relative; }
+/* The lifted copy of a dragged node (body's .mv-ghost) keeps its own
+   placing and carries no label. */
+html[data-ai-labels] .mv-ghost::after { content: none !important; }
+html[data-ai-labels] .mv-by-ai::after,
+html[data-ai-labels] .mv-by-mixed::after,
+html[data-ai-labels] .mv-by-human::after {
+  position: absolute;
+  top: -8px;
+  right: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong, #c6cad2);
+  border-radius: 999px;
+  background: var(--paper, #fff);
+  color: var(--ink-faint, #6b717c);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 9px;
+  font-weight: var(--fw-medium, 500);
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+html[data-ai-labels] .mv-by-ai::after {
+  content: var(--by-label-ai, "AI");
+  border-color: color-mix(in srgb, var(--by-ai) 45%, transparent);
+  background: color-mix(in srgb, var(--by-ai) 10%, var(--paper, #fff));
+  color: var(--by-ai);
+}
+html[data-ai-labels] .mv-by-mixed::after {
+  content: var(--by-label-mixed, "Mixed");
+  border-color: color-mix(in srgb, var(--by-ai) 35%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--by-ai) 12%, var(--paper, #fff)) 50%, var(--paper, #fff) 50%);
+  color: var(--ink-soft, #545a66);
+}
+html[data-ai-labels] .mv-by-human::after {
+  content: var(--by-label-human, "Human");
+  border-color: var(--line, #e3e5ea);
+}
+html[data-ai-labels][data-ai-writing] .mv-node::after { display: none; }
+
+@media (forced-colors: active) {
+  html[data-ai-labels] .mv-node::after { border-color: CanvasText; background: Canvas; color: CanvasText; forced-color-adjust: none; }
+  .mv-link { stroke: CanvasText; }
+  .mv-ghost .mv-title::after { background: CanvasText; }
+  .mv-knob-dot { stroke: CanvasText; fill: Canvas; }
+  .mv-knob.is-folded .mv-knob-dot { fill: CanvasText; }
+  .mv-halo { fill: none; stroke: Highlight; }
+  .mv-note-dot,
+  .mv-edge-dot,
+  .mv-task { border-color: CanvasText; }
+  .mv-node--drop { outline: var(--mv-drop-ring) solid Highlight; }
+}
+
+/* Attach to: the next node chosen becomes the parent. */
+html[data-linking] .mv-node { cursor: crosshair; }

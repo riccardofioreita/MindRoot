@@ -1,0 +1,552 @@
+/* MindRoot - the Markdown panel (js/features/source.js) and what the export
+ * needs on the page (js/features/export.js).
+ *
+ * The panel is a transparent textarea laid over painted rows. They stay in
+ * step only because both wrap the same text in the same box: every measure
+ * that moves a line break - font, size, line height, padding, tab size,
+ * white-space, wrapping, the scrollbar the field shows (measured and given
+ * to the rows as --src-scrollbar) - is set once on .src-editor and read by
+ * both layers. The rows never change an advance width: emphasis is colour,
+ * slant and a text stroke (which paints, it does not lay out), badges sit
+ * outside the line box, and line numbers and bands are written by the
+ * script on the rows in sight only (a CSS counter or :nth-child would make
+ * one inserted line restyle every row below it).
+ *
+ * Placement: a grid row of #main under the stage from 640 px up (its height
+ * written by the script from prefs.sourceHeight), the whole main area on
+ * phones with the chip row at the bottom as a keyboard row. While the field
+ * has the focus on a phone the thumb bar steps aside so the chips sit right
+ * on the keyboard (the two rules that reach into the shell's #thumbbar and
+ * #main say so below).
+ *
+ * Export: the off-screen host the boxes are measured in, the two papers'
+ * colours (an export follows the paper chosen, not the screen's theme), the
+ * print-only sheet a PDF is printed from, and the export sheet's layout. */
+
+/* ================================================================ the panel */
+
+#source.src {
+  --src-fs: var(--fs-sm);
+  --src-lh: var(--lh-loose);
+  --src-pad-y: var(--sp-3);
+  --src-pad-l: var(--sp-2);
+  --src-pad-r: var(--sp-4);
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "title chips actions"
+    "editor editor editor";
+  align-items: center;
+  column-gap: var(--sp-2);
+  background: var(--paper-raised);
+  border-top: 1px solid var(--line-strong);
+  padding-bottom: var(--safe-bottom);
+  color: var(--ink);
+}
+
+/* A finger's input never under 16px: iOS zooms into smaller fields. */
+@media (pointer: coarse) {
+  #source.src { --src-fs: 1rem; --src-lh: var(--lh-body); }
+}
+
+.src-title {
+  grid-area: title;
+  padding-left: max(var(--sp-4), var(--safe-left));
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-small);
+  color: var(--ink-soft);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+.src-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: var(--tap-gap);
+  padding: var(--sp-1) max(var(--sp-2), var(--safe-right)) var(--sp-1) 0;
+}
+
+/* ---------------------------------------------------------------- chips */
+
+.src-chips {
+  grid-area: chips;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-1) 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.src-chips::-webkit-scrollbar { display: none; }
+
+.src-chip {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-h);
+  height: var(--control-h);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-chip);
+  background: var(--paper-sunken);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color var(--dur-hover) ease, color var(--dur-hover) ease;
+}
+.src-chip .icon { width: var(--icon-sm); height: var(--icon-sm); }
+.src-chip[aria-pressed="true"],
+.src-chip[aria-checked="true"] { background: var(--accent); color: var(--on-accent); }
+.src-chip[aria-disabled="true"] { color: var(--ink-disabled); }
+.src-chip:active:not([aria-disabled="true"]) { background: var(--pressed); }
+.src-chip:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+@media (hover: hover) and (pointer: fine) {
+  .src-chip:hover:not([aria-disabled="true"]):not([aria-pressed="true"]):not([aria-checked="true"]) { background: var(--line); }
+}
+
+/* The colour of the caret line's branch, or a neutral ring when there is none. */
+.src-swatch {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  border-radius: var(--r-capsule);
+  background: var(--src-chip, transparent);
+  box-shadow: inset 0 0 0 1px var(--line-control);
+}
+
+/* ---------------------------------------------------------------- the grip */
+
+.src-grip {
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--sp-2) / -2);
+  left: 50%;
+  translate: -50% 0;
+  width: calc(var(--grip-w) * 3);
+  height: var(--sp-3);
+  display: grid;
+  place-items: center;
+  cursor: ns-resize;
+  touch-action: none;
+  border-radius: var(--r-capsule);
+}
+.src-grip::before {
+  content: "";
+  width: var(--grip-w);
+  height: var(--grip-h);
+  border-radius: var(--r-capsule);
+  background: var(--line-strong);
+  transition: background-color var(--dur-hover) ease;
+}
+.src-grip:focus-visible { outline: var(--focus-ring); outline-offset: 0; }
+.src-grip:focus-visible::before,
+[data-src-resizing] .src-grip::before { background: var(--accent); }
+@media (hover: hover) and (pointer: fine) {
+  .src-grip:hover::before { background: var(--accent); }
+}
+[data-src-resizing],
+[data-src-resizing] * { cursor: ns-resize !important; user-select: none !important; -webkit-user-select: none !important; }
+
+/* ---------------------------------------------------------------- the editor: field over rows */
+
+/* --src-digits is written here by the script, so the gutter is worked out
+   here too: a custom property is resolved where it is declared. */
+.src-editor {
+  --src-gutter: calc(var(--src-digits, 2) * 1ch + var(--sp-6));
+  grid-area: editor;
+  position: relative;
+  align-self: stretch;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: var(--src-fs);
+  line-height: var(--src-lh);
+  tab-size: 2;
+  -moz-tab-size: 2;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+}
+
+.src-rows {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.src-lines {
+  padding: var(--src-pad-y) 0;
+  will-change: transform;
+}
+
+.src-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--src-gutter) minmax(0, 1fr);
+}
+
+.src-side {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  padding-right: var(--sp-2);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.src-row--alt .src-side { background: var(--paper-sunken); }
+
+/* The fold arrow, drawn from borders: no glyph whose width a font decides. */
+.src-arrow {
+  flex: none;
+  width: 1ch;
+  height: calc(var(--src-lh) * 1em);
+  position: relative;
+}
+.src-arrow.is-open::before,
+.src-arrow.is-closed::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.4em;
+  height: 0.4em;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  translate: -50% -70%;
+  rotate: 45deg;
+}
+.src-arrow.is-closed::before { translate: -70% -50%; rotate: -45deg; color: var(--accent-ink); }
+
+.src-code,
+.src-field {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* The words take the branch's colour, held 78% toward the ink so a 13px
+   line still reads (the palette was made for 2px lines). First the plain
+   fallback for an engine without color-mix(). */
+.src-code {
+  min-width: 0;
+  padding: 0 calc(var(--src-pad-r) + var(--src-scrollbar, 0px)) 0 var(--src-pad-l);
+  color: var(--src-branch, var(--ink));
+  color: color-mix(in oklab, var(--src-branch, var(--ink)) 78%, var(--ink));
+}
+.src-row.is-active .src-code { background: var(--hover); }
+.src-row.is-active .src-num { color: var(--accent-ink); }
+
+/* A closed block says how much it holds, outside the line box. */
+.src-more {
+  position: absolute;
+  top: 0;
+  right: calc(var(--src-pad-r) + var(--src-scrollbar, 0px));
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-chip);
+  background: var(--paper-sunken);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  line-height: calc(var(--src-lh) * var(--src-fs));
+  white-space: nowrap;
+}
+
+/* The field covers the gutter too (its left padding is the gutter): a tap
+   at the start of a line lands in the text, a wheel anywhere scrolls it,
+   and the fold arrows are hit-tested by the script under the glass. */
+.src-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: var(--src-pad-y) var(--src-pad-r) var(--src-pad-y) calc(var(--src-gutter) + var(--src-pad-l));
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--ink);
+  font: inherit;
+  letter-spacing: inherit;
+  tab-size: inherit;
+  -moz-tab-size: inherit;
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-text-fill-color: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.src-field::selection { background: var(--selection); color: transparent; -webkit-text-fill-color: transparent; }
+.src-field:focus-visible { box-shadow: inset 0 0 0 1px var(--focus); }
+.src-field[data-over-fold] { cursor: var(--mr-cursor, pointer); }
+.src-row.is-hover .src-side { color: var(--ink); }
+#source[data-readonly] .src-field { caret-color: transparent; }
+
+/* ---------------------------------------------------------------- tokens */
+
+.t-hash,
+.t-mark,
+.t-quote-mark,
+.t-link-mark,
+.t-image,
+.t-url,
+.t-comment { color: var(--ink-faint); }
+.t-head {
+  color: var(--src-branch, var(--ink));
+  -webkit-text-stroke: 0.035em currentColor;
+}
+.t-head-1 { -webkit-text-stroke-width: 0.05em; }
+.t-bullet { color: var(--src-branch, var(--accent-ink)); }
+.t-box { color: var(--accent-ink); }
+.t-box.is-done { color: var(--ink-faint); }
+.t-done { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+.t-quote { color: var(--ink-soft); font-style: italic; }
+.t-note { color: var(--note); }
+.t-tint { color: var(--src-tint, var(--ink-faint)); color: color-mix(in oklab, var(--src-tint, var(--ink-faint)) 70%, var(--ink-faint)); }
+.t-link,
+.t-alt { color: var(--accent-ink); text-decoration: underline; text-decoration-color: var(--line-strong); }
+.t-code,
+.t-fence { color: var(--ink-soft); }
+.t-code { background: var(--paper-sunken); border-radius: var(--r-chip); }
+.t-strong { -webkit-text-stroke: 0.035em currentColor; }
+.t-em { font-style: italic; }
+.t-strike { text-decoration: line-through; }
+.t-highlight { background: var(--selection); border-radius: var(--r-chip); }
+
+/* ---------------------------------------------------------------- medium: chips on a row of their own */
+
+@media (max-width: 1023px) {
+  #source.src {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "title . actions"
+      "chips chips chips"
+      "editor editor editor";
+  }
+  .src-chips { padding: 0 max(var(--sp-3), var(--safe-left)) var(--sp-2); }
+}
+
+/* ---------------------------------------------------------------- phones: the whole main area */
+
+@media (max-width: 639px) {
+  /* Over every row of #main: an absolutely placed grid item takes its
+     grid area as its containing block. */
+  #source.src {
+    grid-row: 1 / -1;
+    grid-column: 1 / -1;
+    position: absolute;
+    z-index: var(--z-panel);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--thumb-space, 0px);
+    height: auto;
+    max-height: none;
+    padding-top: var(--safe-top);
+    padding-bottom: 0;
+    border-top: 0;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title . actions"
+      "editor editor editor"
+      "chips chips chips";
+  }
+  .src-grip { display: none; }
+  .src-chips {
+    padding: var(--sp-1) max(var(--sp-2), var(--safe-left)) var(--sp-1);
+    border-top: 1px solid var(--line);
+    background: var(--paper-raised);
+  }
+  .src-editor { border-top: 1px solid var(--line); }
+
+  /* Typing: the chips become the row on top of the keyboard. This reaches
+     into the shell's thumb bar on purpose: its node actions mean nothing
+     while text is being written, and it would sit between the chips and
+     the keyboard. */
+  html:has(#source .src-field:focus) #thumbbar { display: none; opacity: 0; }
+  html:has(#source .src-field:focus) #source.src { bottom: var(--kb, 0px); }
+}
+
+/* ---------------------------------------------------------------- entrance */
+
+/* Rises in; no exit, on purpose: it is a grid row, and fading it out would
+   keep the map short for the length of the fade and then snap. */
+#source.src:not([hidden]) {
+  transition: opacity var(--dur-panel) var(--ease-out), translate var(--dur-panel) var(--ease-out);
+}
+@starting-style {
+  #source.src:not([hidden]) { opacity: 0; translate: 0 var(--rise); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #source.src:not([hidden]) { transition-duration: 1ms; }
+  .src-chip, .src-grip::before { transition-duration: 1ms; }
+}
+
+/* ---------------------------------------------------------------- forced colours */
+
+@media (forced-colors: active) {
+  .src-field { color: CanvasText; -webkit-text-fill-color: CanvasText; }
+  .src-rows .src-code { visibility: hidden; }
+  .src-chip { border: 1px solid ButtonText; }
+  .src-chip[aria-pressed="true"],
+  .src-chip[aria-checked="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+}
+
+/* ================================================================ export */
+
+/* The two papers an export can be drawn on, as hex (tools reading the file
+   know nothing of the theme). Kept in step with tokens.css; --xp-mark is
+   the selection tint laid flat on its paper. */
+.xp-paper--light {
+  --xp-paper: #fbfbfc;
+  --xp-raised: #ffffff;
+  --xp-sunken: #f3f4f6;
+  --xp-ink: #15171c;
+  --xp-ink-soft: #545a66;
+  --xp-ink-faint: #6b717c;
+  --xp-line: #e3e5ea;
+  --xp-line-strong: #c6cad2;
+  --xp-line-control: #8a909b;
+  --xp-accent: #2f7d5a;
+  --xp-accent-ink: #2a6f50;
+  --xp-on-accent: #ffffff;
+  --xp-note: #8a5fbf;
+  --xp-danger: #b4485f;
+  --xp-mark: #cfe2d9;
+}
+.xp-paper--dark {
+  --xp-paper: #131519;
+  --xp-raised: #1a1d22;
+  --xp-sunken: #0f1114;
+  --xp-ink: #e4e6ea;
+  --xp-ink-soft: #9ba1ac;
+  --xp-ink-faint: #858b95;
+  --xp-line: #282c33;
+  --xp-line-strong: #3a3f48;
+  --xp-line-control: #727883;
+  --xp-accent: #4fae82;
+  --xp-accent-ink: #5cbb8f;
+  --xp-on-accent: #131519;
+  --xp-note: #b389e0;
+  --xp-danger: #d4667c;
+  --xp-mark: #253a33;
+}
+
+/* Where the boxes are measured: laid out (never display:none, which
+   measures nothing), out of sight, out of the way. */
+.xp-host {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 1000px;
+  height: 1000px;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+/* What only the export embeds is Montserrat: note cards and missing
+   pictures, which use the chrome's font on screen, are measured in it. */
+.xp-host .mv-card,
+.xp-host .mv-img[data-broken="true"] { font-family: var(--font-map); }
+/* A note on the arriving link, in the node's own box (see export.js). */
+.xp-host .xp-edge { font-style: italic; border-left-style: dashed; }
+
+.xp-clip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The page a PDF is printed from: nothing else prints, the drawing fills
+   the page (its viewBox keeps it whole on any paper that ignores the
+   @page size). */
+.xp-print { display: none; }
+@media print {
+  html[data-printing],
+  html[data-printing] body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    background: transparent;
+  }
+  html[data-printing] body > :not(.xp-print) { display: none !important; }
+  html[data-printing] .xp-print {
+    display: block !important;
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  html[data-printing] .xp-print > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+  }
+}
+
+/* ---------------------------------------------------------------- the export sheet */
+
+/* Held by its top edge: each format has its own options, and a sheet
+   centred again for each height would move the format tabs out from
+   under the pointer that just chose one. */
+.sheet.xp[data-place="center"] { margin-block: max(var(--sp-6), 12vh) auto; }
+
+.xp-sheet {
+  display: grid;
+  gap: var(--sp-2);
+}
+.xp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--row-h);
+}
+.xp-row--format { margin-bottom: var(--sp-2); }
+.xp-row--format .seg { width: 100%; }
+.xp-row--format .seg__opt { flex: 1 1 0; }
+.xp-label { font-size: var(--fs-ui); color: var(--ink); }
+.xp-picture { display: grid; gap: var(--sp-2); }
+/* With the board up the sheet asks first what to export (the board or the
+   map); only that one's options show. */
+.xp-part { display: grid; gap: var(--sp-2); }
+.xp-part[hidden] { display: none; }
+.xp-row--what {
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--line);
+}
+.xp-row--what .seg { width: 100%; }
+.xp-row--what .seg__opt { flex: 1 1 0; }
+.xp-hint {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  color: var(--ink-soft);
+}
+.seg__opt:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
