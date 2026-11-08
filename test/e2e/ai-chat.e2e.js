@@ -252,6 +252,21 @@ module.exports = async function (t) {
   t.eq(made.name, 'Botany exam', 'named after its centre');
   t.eq(made.text, '# Botany exam <!-- by: ai -->\n\n## Plant cells <!-- by: ai -->\n\n### Walls <!-- by: ai -->\n\n## Photosynthesis <!-- by: ai -->\n', 'the outline, written as a map');
 
+  t.step('the same proposal as separate maps, one undo step');
+  var maps1 = await ev(function () { return window.MindRoot.store.project().maps.length; });
+  await page.locator('.aichat__proposal').last().locator('[data-act="split"]').click();
+  await E.until(page, function (n) { return window.MindRoot.store.project().maps.length === n + 3; }, maps1);
+  var split = await ev(function () {
+    var maps = window.MindRoot.store.project().maps;
+    var centre = maps.filter(function (m) { return /\[\[Plant cells\]\]/.test(m.text); })[0];
+    var cells = maps.filter(function (m) { return m.name === 'Plant cells'; })[0];
+    return { centre: !!centre && /\[\[Photosynthesis\]\]/.test(centre.text), cells: cells ? cells.text : '' };
+  });
+  t.eq(split.centre, true, 'a central map linking to a map per branch');
+  t.eq(/^# Plant cells/.test(split.cells) && /Walls/.test(split.cells) && /\[\[Botany exam 2\]\]/.test(split.cells), true, 'each branch a map with its nodes, linking back');
+  await ev(function () { window.MindRoot.store.undo(); });
+  t.eq(await ev(function () { return window.MindRoot.store.project().maps.length; }), maps1, 'one undo takes the three maps back');
+
   t.step('the whole project, and another project ticked as readable from anywhere');
   var other = await ev(function () {
     var st = window.MindRoot.store;

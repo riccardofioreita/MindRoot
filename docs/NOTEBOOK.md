@@ -91,3 +91,7 @@ assets/<slug>.book/
 - `js/features/ink.js`: gains page bounds (pages mode: draw clipped to the page, rulers off), the paper layer underneath (from `ns.paper`), the semantic `ink` colour, background colour, and an option to use a toolbar shared by several page editors.
 - `js/features/media.js`: node drawings open `ns.notebook` inside the viewer (three placements unchanged); the board no longer opens in the viewer.
 - Board view switch: the top-bar segmented control, `Mod+Shift+L`, and the stage swap (map ↔ notebook) belong to `js/features/notebook.js` (it registers the `view.board` command and mounts into `#stage`); `js/app.js` / `js/core/ui.js` only expose the slot.
+
+## Laser pointer
+
+The pen has a laser mode (`js/features/ink.js`): the button beside the pen in the wide layout (it takes the pen with the laser on) or Ink | Laser in the pen's options (both layouts). With it on, a pen gesture records screen points in a trail drawn on a layer of its own above the sheet (`.ink__laser`, an SVG with a glow, a core and a dot); points older than 700 ms fall off, so the trail fades from behind and is gone within a second of the pen lifting. Nothing is ever made of it: no element, no draft, nothing dirty, no undo step, nothing saved. Another tool, read-only and closing the editor turn it off. The state lives in the editor only (`data-laser` on the editor's root); it is not a preference.

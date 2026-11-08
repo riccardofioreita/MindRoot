@@ -1064,6 +1064,12 @@ window.MindRoot = window.MindRoot || {};
       var got = D.addOutline(D.parse(text), '', nodes, 'ai');
       if (got) text = got.result.text;
     }
+    /* Split: the [[links]] back to the central map must name it alone. */
+    if (split) {
+      var taken = (st.project(pid).maps || []).map(function (m) { return String(m.name || '').toLowerCase(); });
+      var base = name;
+      for (var k = 2; taken.indexOf(name.toLowerCase()) >= 0; k++) name = base + ' ' + k;
+    }
     var made = null;
     var parts = null;
     var build = function () {
