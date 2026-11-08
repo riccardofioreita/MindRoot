@@ -21,7 +21,7 @@
 
 'use strict';
 
-var VERSION = '2.1.0-2';
+var VERSION = '2.1.0-3';
 var PREFIX = 'mindroot2-';
 var CACHE = PREFIX + VERSION;
 

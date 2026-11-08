@@ -65,6 +65,7 @@ window.MindRoot = window.MindRoot || {};
   var PAGE_MIN = 297;            // mm: the longest side never under A4 landscape
   var PAGE_MAX = 5080;           // mm: 200 in, the PDF page limit
   var PHOTO_MAX = 660;           // px: a 220 px picture kept sharp at 3x
+  var GIF_KEEP_CHARS = 2 * 1024 * 1024; // an animated GIF up to about 1.5 MB stays animated in an SVG
   var IMAGE_WAIT = 4000;
   var KNOB_R = 6;
   var STUB_DROP = 1;
@@ -261,6 +262,10 @@ window.MindRoot = window.MindRoot || {};
     if (!St || typeof St.assetDataURL !== 'function') return Promise.resolve(null);
     return Promise.resolve().then(function () { return St.assetDataURL(ns.store, pid, path); }).then(function (url) {
       if (!url) return null;
+      /* An animated GIF stays itself in an SVG (it moves there too), unless
+       * it would swell the file: then, like any photo, its first frame
+       * scaled down. */
+      if (/^data:image\/gif/i.test(url) && url.length <= GIF_KEEP_CHARS) return url;
       if (/^data:image\/(png|jpeg|webp|gif|bmp)/i.test(url)) return downscale(url, PHOTO_MAX);
       return url;
     }, function () { return null; });

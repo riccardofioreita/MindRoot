@@ -46,7 +46,7 @@ No install step, no build, no server of your own:
 ![The map and its Markdown side by side](docs/screens/markdown.png)
 
 - **A tree you shape freely.** Add, rename, move, fold and colour nodes; branches grow on either side of the central node, and any node can be dragged anywhere while it stays attached to its parent. Tidy puts everything back in order in one step.
-- **Words under a node** (with bulleted, numbered and to-do lists), notes on the node and on its line, boxes to tick, links to the web and to other maps (`[[Another map]]`), mentions of any node of the project (`@`), pictures and drawings.
+- **Words under a node** (with bulleted, numbered and to-do lists), notes on the node and on its line, boxes to tick, links to the web and to other maps (`[[Another map]]`), mentions of any node of the project (`@`), pictures (PNG, JPEG, WebP, SVG and animated GIF, which keeps moving on the map, on boards and in an SVG export; PNG and PDF exports show its first frame) and drawings.
 - **The Markdown panel** (Ctrl+M) shows the same map as text; both stay in step as you type, and an edit rewrites only the lines it is about.
 - **Projects** group maps, each with its own pictures, trash and timed copies. Ctrl+K finds any command, place or node of any map.
 - **One map per topic.** When a map grows into several topics, "Turn the branch into a map" (node menu) or "Split the branches into maps" (central node's menu) moves branches into maps of their own in the project: each branch stays behind as a `[[link]]` that opens its map, the new map's central node carries a note that links back, and one Undo takes it all back. The AI chat can make a proposal straight away "As separate maps".

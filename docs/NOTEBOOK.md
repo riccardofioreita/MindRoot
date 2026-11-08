@@ -95,3 +95,7 @@ assets/<slug>.book/
 ## Laser pointer
 
 The pen has a laser mode (`js/features/ink.js`): the button beside the pen in the wide layout (it takes the pen with the laser on) or Ink | Laser in the pen's options (both layouts). With it on, a pen gesture records screen points in a trail drawn on a layer of its own above the sheet (`.ink__laser`, an SVG with a glow, a core and a dot); points older than 700 ms fall off, so the trail fades from behind and is gone within a second of the pen lifting. Nothing is ever made of it: no element, no draft, nothing dirty, no undo step, nothing saved. Another tool, read-only and closing the editor turn it off. The state lives in the editor only (`data-laser` on the editor's root); it is not a preference.
+
+## Animated GIF
+
+A GIF put on a sheet is never drawn again on a canvas (that keeps only its first frame): `loadPicture` in `js/features/ink.js` leaves it as it is, whatever its size, and refuses it only when it is too big for the file (`IMAGE_MAX_CHARS`). Other pictures larger than `IMAGE_MAX_SIDE` are still scaled down. An SVG export keeps a GIF of up to about 1.5 MB as it is, so it moves there too (`GIF_KEEP_CHARS` in `js/features/export.js`).

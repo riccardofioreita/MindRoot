@@ -3606,8 +3606,12 @@ window.MindRoot = window.MindRoot || {};
             var nw = img.naturalWidth || 320;
             var nh = img.naturalHeight || 200;
             var svg = /svg/i.test(type);
+            /* A GIF is never drawn again on a canvas: that would keep only
+             * its first frame. It goes in as it is (and moves), or is
+             * refused below when it is too big for the file. */
+            var gif = /^image\/gif$/i.test(type) || /^data:image\/gif/i.test(href);
             var out = href;
-            if (!svg && (Math.max(nw, nh) > IMAGE_MAX_SIDE || (bytes > 3 * 1024 * 1024 && type !== 'image/gif'))) {
+            if (!svg && !gif && (Math.max(nw, nh) > IMAGE_MAX_SIDE || bytes > 3 * 1024 * 1024)) {
               var f = Math.min(1, IMAGE_MAX_SIDE / Math.max(nw, nh));
               var cv = document.createElement('canvas');
               cv.width = Math.max(1, Math.round(nw * f));
