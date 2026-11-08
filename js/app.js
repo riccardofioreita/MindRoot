@@ -104,7 +104,7 @@ window.MindRoot = window.MindRoot || {};
    * tab guard goes first: it decides whether this tab may write before
    * anything opens a map. */
   var MODULES = ['tabs', 'sidebar', 'session', 'editor', 'notes', 'colorpicker', 'source', 'exporter', 'media', 'ink',
-    'notebook', 'aiui', 'aichat', 'mentions', 'trash', 'copies', 'palette', 'settings', 'help', 'welcome', 'pwa'];
+    'notebook', 'aiui', 'aichat', 'mentions', 'laser', 'trash', 'copies', 'palette', 'settings', 'help', 'welcome', 'pwa'];
 
   /* The ids the modules register (session: history.*, editor: node.*,
    * workspace: search.nodes and palette.open). */
@@ -134,10 +134,18 @@ window.MindRoot = window.MindRoot || {};
       { slot: 'edit', ids: ['node.rename'] },
       { slot: 'undo', ids: UNDO }
     ],
+    /* A phone's top right: what the thumb bar has no room for and is
+     * wanted often - the Markdown, the chat with the AI, the laser. */
+    quick: [
+      { slot: 'source', ids: ['source.toggle'] },
+      { slot: 'chat', ids: ['ai.chat'] },
+      { slot: 'laser', ids: ['view.laser'] }
+    ],
     zoom: [
       { slot: 'zoomOut', ids: ['view.zoomOut'] },
       { slot: 'fit', ids: ['view.fit'] },
       { slot: 'zoomIn', ids: ['view.zoomIn'] },
+      { slot: 'laser', ids: ['view.laser'] },
       { slot: 'tidy', ids: ['map.tidy'] }
     ]
   };
@@ -150,7 +158,7 @@ window.MindRoot = window.MindRoot || {};
   var MORE_GROUPS_WIDE = ['map', 'view', 'help'];
   var MORE_ADD_WIDE = ['file.import', 'export.open', 'export.markdown', 'settings.open'];
   var MORE_SKIP_WIDE = ['sidebar.newMap', 'map.rename', 'map.duplicate', 'map.importBranches', 'map.delete',
-    'view.zoomIn', 'view.zoomOut', 'view.fit', 'view.sidebar', 'welcome.sample'];
+    'view.zoomIn', 'view.zoomOut', 'view.fit', 'view.laser', 'view.sidebar', 'welcome.sample'];
 
   function addStrings() {
   i18n.add({
@@ -158,6 +166,7 @@ window.MindRoot = window.MindRoot || {};
       'app.region.sidebar': 'Projects and maps',
       'app.region.stage': 'Map',
       'app.region.source': 'Markdown',
+      'app.region.quick': 'Markdown and AI',
       'app.region.actions': 'Actions',
       'app.region.zoom': 'Zoom',
       'app.cmd.sidebar': 'Show or hide the projects',
@@ -219,6 +228,7 @@ window.MindRoot = window.MindRoot || {};
       'app.region.sidebar': 'Progetti e mappe',
       'app.region.stage': 'Mappa',
       'app.region.source': 'Markdown',
+      'app.region.quick': 'Markdown e AI',
       'app.region.actions': 'Azioni',
       'app.region.zoom': 'Zoom',
       'app.cmd.sidebar': 'Mostra o nascondi i progetti',
@@ -284,7 +294,7 @@ window.MindRoot = window.MindRoot || {};
   var els = {};
   var shell = {
     layout: null,
-    bars: { top: [], thumb: [], zoom: [] },
+    bars: { top: [], thumb: [], zoom: [], quick: [] },
     viewEsc: null,
     drawerEsc: null,
     themeMetas: []
@@ -507,10 +517,25 @@ window.MindRoot = window.MindRoot || {};
     if (next === 'expanded') setSidebar(prefs.get('sidebarOpen'), { persist: false, focus: false });
     else setSidebar(false, { persist: false, focus: false });
     if (els.toggleUse) els.toggleUse.setAttribute('href', next === 'compact' ? '#i-menu' : '#i-sidebar');
+    placeToggle(next);
     renderBars();
     /* A bar that comes into sight with the new layout gets its Tab stop. */
     if (shell.rovingThumb) shell.rovingThumb.refresh();
     if (shell.rovingZoom) shell.rovingZoom.refresh();
+  }
+
+  /* The projects button: first in the dock wherever there is one (it opens
+   * the floating panel of projects), in the title capsule on a phone (the
+   * hamburger by the map's name). The same element moves, so its label,
+   * aria-expanded and every listener go with it. */
+  function placeToggle(layout) {
+    if (!els.toggle || !els.lead) return;
+    if (layout === 'compact') {
+      if (shell.toggleCtl) { shell.toggleCtl(); shell.toggleCtl = null; }
+      if (els.toggle.parentNode !== els.lead) els.lead.insertBefore(els.toggle, els.lead.firstChild);
+    } else if (!shell.toggleCtl) {
+      shell.toggleCtl = addTopControl(els.toggle, { before: 'undo' });
+    }
   }
 
   /* The share of the layout viewport an on-screen keyboard covers. iOS does
@@ -542,17 +567,24 @@ window.MindRoot = window.MindRoot || {};
     if (!els.stage || viewOnly()) return out;
     var stage = els.stage.getBoundingClientRect();
     var gap = 8;
-    [els.lead, els.actions].forEach(function (el) {
+    [els.lead, els.quick].forEach(function (el) {
       if (!el || el.offsetParent === null) return;
       var r = el.getBoundingClientRect();
       if (r.height) out.top = Math.max(out.top, Math.round(r.bottom - stage.top + gap));
     });
+    /* The dock lies along the foot of the map. The zoom capsule, upright in
+     * the corner, is no inset: what is placed over the map steps round it
+     * as round any capsule (editor.js chromeBoxes). */
+    if (els.actions && els.actions.offsetParent !== null) {
+      var d = els.actions.getBoundingClientRect();
+      if (d.height) out.bottom = Math.max(out.bottom, Math.round(stage.bottom - d.top + gap));
+    }
     /* The format bar docked above the thumb bar (a phone writing a name)
      * covers the map as much as the thumb bar does: a node opened for
      * writing behind it would be typed into blind. */
     var bar = ns.editor ? ns.editor.formatBar : null;
     var docked = bar && !bar.hidden && bar.hasAttribute('data-docked') ? bar : null;
-    [els.thumbbar, els.zoombar, docked].forEach(function (el) {
+    [els.thumbbar, els.zoombar && els.zoombar.getBoundingClientRect().height <= els.zoombar.getBoundingClientRect().width ? els.zoombar : null, docked].forEach(function (el) {
       if (!el || el.hidden || !el.getClientRects().length) return;
       var r = el.getBoundingClientRect();
       if (r.height) out.bottom = Math.max(out.bottom, Math.round(stage.bottom - r.top + gap));
@@ -684,18 +716,20 @@ window.MindRoot = window.MindRoot || {};
    * module registered one later), and focus survives the rebuild. */
   function renderBars() {
     if (!els.actions) return;
-    var plan = { top: resolvedIds(BARS.top), thumb: resolvedIds(BARS.thumb), zoom: resolvedIds(BARS.zoom) };
-    if (shell.plan && shell.plan.top === plan.top && shell.plan.thumb === plan.thumb && shell.plan.zoom === plan.zoom) {
+    var plan = { top: resolvedIds(BARS.top), thumb: resolvedIds(BARS.thumb), zoom: resolvedIds(BARS.zoom), quick: resolvedIds(BARS.quick) };
+    if (shell.plan && shell.plan.top === plan.top && shell.plan.thumb === plan.thumb && shell.plan.zoom === plan.zoom && shell.plan.quick === plan.quick) {
       updateBars();
       return;
     }
     shell.plan = plan;
     var active = document.activeElement;
-    var bar = active && active.closest ? active.closest('#topbar-actions, #thumbbar, #zoombar') : null;
+    var bar = active && active.closest ? active.closest('#topbar-actions, #thumbbar, #zoombar, #topbar-quick') : null;
     var key = bar ? (active.getAttribute('data-command') || (active.classList.contains('btn--more') ? 'more' : null)) : null;
     shell.bars.top = fillBar(els.actions, BARS.top, true, topControls);
     shell.bars.thumb = fillBar(els.thumbbar, BARS.thumb, true);
     shell.bars.zoom = fillBar(els.zoombar, BARS.zoom, false);
+    shell.bars.quick = fillBar(els.quick, BARS.quick, false);
+    if (shell.rovingQuick) shell.rovingQuick.refresh();
     if (shell.rovingTop) shell.rovingTop.refresh();
     if (shell.rovingZoom) shell.rovingZoom.refresh();
     if (shell.rovingThumb) shell.rovingThumb.refresh();
@@ -710,8 +744,8 @@ window.MindRoot = window.MindRoot || {};
    * title(), on every event that can change them (one pass per frame). */
   function updateBars() {
     var ctx = { source: 'button' };
-    ['top', 'thumb', 'zoom'].forEach(function (name) {
-      shell.bars[name].forEach(function (b) {
+    ['top', 'thumb', 'zoom', 'quick'].forEach(function (name) {
+      (shell.bars[name] || []).forEach(function (b) {
         swapButton(b, slotCommand(b));
         if (!commands.has(b.id)) return;
         var on = commands.enabled(b.id, ctx);
@@ -1100,6 +1134,7 @@ window.MindRoot = window.MindRoot || {};
     els.lead = byId('topbar-lead');
     els.actions = byId('topbar-actions');
     els.thumbbar = byId('thumbbar');
+    els.quick = byId('topbar-quick');
     els.layers = byId('layers') || document.body;
     els.drop = byId('drop');
     els.banners = byId('banners');
@@ -1146,6 +1181,7 @@ window.MindRoot = window.MindRoot || {};
     shell.rovingZoom = ui.roving(els.zoombar);
     /* The phone's thumb bar is a toolbar too: one Tab stop, arrows inside. */
     shell.rovingThumb = els.thumbbar ? ui.roving(els.thumbbar) : null;
+    shell.rovingQuick = els.quick ? ui.roving(els.quick) : null;
 
     applyLayout();
     ['(max-width: 639px)', '(min-width: 1024px)'].forEach(function (q) {

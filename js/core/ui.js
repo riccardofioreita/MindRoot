@@ -357,11 +357,13 @@ window.MindRoot = window.MindRoot || {};
     el.style.removeProperty('--avail-h');
     el.style.left = '0px';
     el.style.top = '0px';
-    var p = computePlacement({ w: el.offsetWidth, h: el.offsetHeight }, rect, box, opts);
+    var h0 = el.offsetHeight;
+    var p = computePlacement({ w: el.offsetWidth, h: h0 }, rect, box, opts);
     el.style.setProperty('--avail-h', Math.max(64, Math.floor(p.maxH)) + 'px');
-    /* A capped height changes the size: measure again so the flip and the
-     * clamp use what will really be drawn. */
-    if (el.offsetHeight > p.maxH + 1) p = computePlacement({ w: el.offsetWidth, h: el.offsetHeight }, rect, box, opts);
+    /* The new cap changes the size - down to the room there is, or up from
+     * the fallback cap it was measured under: measure again so the flip and
+     * the clamp use what will really be drawn. */
+    if (Math.abs(el.offsetHeight - h0) > 1) p = computePlacement({ w: el.offsetWidth, h: el.offsetHeight }, rect, box, opts);
     el.style.left = p.x + 'px';
     el.style.top = p.y + 'px';
     el.style.setProperty('--origin', p.originX + 'px ' + p.originY + 'px');
@@ -691,11 +693,22 @@ window.MindRoot = window.MindRoot || {};
     el.addEventListener('keydown', onKey);
     window.addEventListener('resize', onResize);
     document.addEventListener('scroll', onScroll, true);
+    /* Rows can grow after the first placement (a label or a count filled
+     * in late): placed again, a menu that opens upwards - from the dock at
+     * the foot of the map - keeps its foot by its anchor, whole on screen. */
+    var lastH = el.offsetHeight;
+    var sizeWatch = typeof ResizeObserver === 'function' ? new ResizeObserver(function () {
+      if (closed || el.offsetHeight === lastH) return;
+      lastH = el.offsetHeight;
+      position(el, anchor || opts.rect, { side: opts.side || 'bottom', align: opts.align || 'start', offset: opts.offset == null ? 6 : opts.offset, shift: true });
+    }) : null;
+    if (sizeWatch) sizeWatch.observe(el);
 
     function close(o) {
       if (closed) return;
       closed = true;
       o = o || {};
+      if (sizeWatch) sizeWatch.disconnect();
       popEsc();
       document.removeEventListener('pointerdown', outside, true);
       window.removeEventListener('resize', onResize);

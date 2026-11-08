@@ -21,7 +21,7 @@
 
 'use strict';
 
-var VERSION = '2.1.0-1';
+var VERSION = '2.1.0-2';
 var PREFIX = 'mindroot2-';
 var CACHE = PREFIX + VERSION;
 
@@ -78,6 +78,7 @@ var OPTIONAL = [
   'js/features/ai-ui.js',
   'js/features/ai-chat.js',
   'js/features/mentions.js',
+  'js/features/laser.js',
   'js/features/media.js',
   'js/features/sidebar.js',
   'js/features/trash.js',

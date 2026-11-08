@@ -28,6 +28,8 @@ Ogni mappa è un file `.md` che puoi leggere e modificare anche in Obsidian, VS 
 
 ## L'aspetto
 
+**Un dock, la mappa al centro.** Il nome della mappa fluttua da solo in alto a sinistra; tutte le azioni - progetti, annulla e ripeti, Markdown, AI, chat, ricerca, Mappa | Lavagna e Altro - stanno in un unico dock di vetro ai piedi della mappa; zoom, adatta, laser e riordina stanno in verticale sul bordo destro; i progetti si aprono come un pannello di vetro sospeso. Su telefono il dock è la barra per il pollice, con Markdown, chat AI e laser a un tocco in alto a destra.
+
 L'interfaccia di MindRoot è disegnata in **vetro liquido**: barre, menu, pannelli e fogli sono vetro trasparente con un bordo speculare e un riflesso morbido, sospesi su una pagina illuminata da una luce ambientale tenue (`css/liquid.css`, token in `css/tokens.css`). La mappa - carta, inchiostro, colori dei rami - non cambia, quindi ciò che ha significato si legge esattamente come prima. Trasparenza ridotta (Impostazioni o sistema), contrasto elevato e colori forzati danno superfici piene.
 
 ## Come aprirlo
@@ -61,7 +63,8 @@ Ogni mappa ha una **lavagna** (Mappa | Lavagna, Ctrl+Maiusc+L), e ogni nodo può
 - **Tele infinite** (il default) o **pagine di formato fisso** (da A3 ad A6, B5, Letter, Legal, quadrato, 16:9, 4:3, iPad o qualsiasi misura in mm).
 - **30 carte**: puntini, quadretti, righe, rigature scolastiche, appunti Cornell, carta millimetrata, logaritmica e polare, pentagrammi, wireframe, agende, guide di calligrafia, o un'immagine tua.
 - **Strumenti**: penna, matita, pennarello, pennello ed evidenziatore sensibili alla pressione, forme, frecce, testo, immagini, selezione e una gomma per parte di un tratto, un tratto intero o un'area. L'inchiostro segue il tema.
-- **Puntatore laser** (solo penna): il pulsante con punto e raggi accanto alla penna, oppure Inchiostro | Laser nelle opzioni della penna. La penna lascia una scia rossa che svanisce entro un secondo - per presentare o indicare durante una chiamata - e non disegna nulla: nessun tratto, nessun salvataggio, nessun passo di annullamento. Qualsiasi altro strumento lo spegne.
+- **Puntatore laser anche sulla mappa**: il pulsante con punto e raggi nella capsula dello zoom (o Ctrl+Alt+L) indica la mappa con la stessa scia rossa che svanisce - con il mouse basta muoversi, con il dito si trascina - senza spostare né cambiare nulla. Esc o di nuovo il pulsante lo spegne.
+- **Puntatore laser** nei quaderni (solo penna): il pulsante con punto e raggi accanto alla penna, oppure Inchiostro | Laser nelle opzioni della penna. La penna lascia una scia rossa che svanisce entro un secondo - per presentare o indicare durante una chiamata - e non disegna nulla: nessun tratto, nessun salvataggio, nessun passo di annullamento. Qualsiasi altro strumento lo spegne.
 - **Pagine e tele** con le miniature per aggiungere, duplicare, riordinare e ripristinare; **esporta** un PDF di tutte le pagine o un PNG di una.
 
 Un quaderno è una cartella del progetto (`assets/<nome>.book/`) con un `book.json` e un SVG per pagina: ogni pagina si legge anche fuori da MindRoot e porta dentro il suo disegno modificabile.
@@ -93,7 +96,7 @@ Pannelli dal basso e una barra per il pollice, invece di un desktop rimpicciolit
 
 - un tocco seleziona un nodo, un doppio tocco lo rinomina, una pressione lunga apre il suo menu (continua a muovere il dito per trascinarlo);
 - un dito sposta la mappa, due dita fanno zoom; un trascinamento dal bordo sinistro mostra i progetti;
-- la barra in basso ha figlio, fratello, rinomina e annulla, e «Altro» per il resto;
+- la barra in basso ha figlio, fratello, rinomina e annulla, e «Altro» per il resto; una piccola capsula in alto a destra apre con un tocco il Markdown, la chat AI e il laser;
 - in un quaderno un dito disegna finché non hai usato una penna, e da lì in poi sposta.
 
 ## I tuoi dati
@@ -124,6 +127,7 @@ Su Mac, Ctrl vuol dire ⌘. L'elenco completo è nell'aiuto (F1 o `?`), generato
 | Ctrl+M | Il pannello Markdown |
 | Ctrl+Maiusc+L | Mappa o lavagna |
 | Ctrl+Maiusc+A / Ctrl+Maiusc+H | La finestra dell'assistente AI / la chat AI |
+| Ctrl+Alt+L | Il puntatore laser sulla mappa |
 | Ctrl+. | Suggerisci rami (AI) |
 | Ctrl+Maiusc+E / Ctrl+O | Esporta / importa |
 | Ctrl+S / Ctrl+, | Salva ora / impostazioni |

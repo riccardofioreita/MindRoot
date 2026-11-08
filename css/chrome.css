@@ -121,6 +121,25 @@
   #app { grid-template-columns: calc(var(--sidebar-w) + var(--safe-left)) minmax(0, 1fr); }
   html[data-sidebar="closed"] #app { grid-template-columns: 0 minmax(0, 1fr); }
   html[data-sidebar="closed"] #sidebar { visibility: hidden; border-right: 0; }
+  /* A floating panel of glass inside its column, the ambient light showing
+     round it; the column keeps its width, so the map's box is unchanged. */
+  #sidebar {
+    margin: max(var(--chrome-gap), var(--safe-top)) 0 max(var(--chrome-gap), var(--safe-bottom)) max(var(--chrome-gap), var(--safe-left));
+    padding: 0;
+    border-right: 0;
+    border-radius: var(--r-panel);
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  #sidebar {
+    top: max(var(--chrome-gap), var(--safe-top));
+    bottom: max(var(--chrome-gap), var(--safe-bottom));
+    left: max(var(--chrome-gap), var(--safe-left));
+    width: var(--drawer-w);
+    padding: 0;
+    border-radius: var(--r-panel);
+    translate: calc(-100% - 2 * var(--chrome-gap)) 0;
+  }
 }
 
 /* Medium and compact: an overlay drawer, closed unless opened. No scrim:
@@ -188,7 +207,10 @@
   pointer-events: auto;
 }
 .topbar__slot--lead { flex: 0 1 auto; }
-.topbar__slot--actions { flex: none; margin-left: auto; }
+.topbar__slot--actions { flex: none; }
+/* The phone's quick capsule (Markdown, AI chat, laser): only under 640px,
+   where the actions capsule moves down to the thumb. */
+.topbar__slot--quick { display: none; }
 .topbar__slot > * { min-width: 0; }
 
 .capsule {
@@ -340,6 +362,10 @@
   /* Only the lead capsule (menu, title, save dot) on top; the actions moved
      down to the thumb. */
   .topbar__slot--actions { display: none; }
+  .topbar__slot--quick { display: flex; flex: none; margin-left: auto; }
+  /* Too narrow for both side by side (a 320px phone with Map | Board in the
+     title capsule): the quick capsule wraps under it, at the right. */
+  #topbar { flex-wrap: wrap; row-gap: var(--sp-2); }
   .topbar__slot--lead { flex: 0 1 auto; max-width: 100%; }
   .topbar__slot--lead > .capsule { flex: 0 1 auto; max-width: 100%; }
   .title[data-has-map] .title__project,
@@ -355,6 +381,52 @@
    still a finger: targets keep their 44 px (pointer: coarse), and the map's
    name stays in the top bar, where there is width for it. */
 
+/* ---------------------------------------------------------------- the dock */
+
+/* Layout v3: the title floats alone at the top left (the top right stays
+   free for a node's bar to dock in when the map is dense); every action lives
+   in one glass dock at the foot of the map, centred; zoom stands upright at
+   the right edge. A grid item in the stage's own cell, like the zoom
+   capsule, so it rises with the map when the Markdown panel docks. Kept
+   clear of the zoom column on both sides so the two never meet. Phones
+   keep their thumb bar (the dock is hidden there, see the thumb bar). */
+#dock {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: end;
+  justify-self: center;
+  position: relative;
+  z-index: var(--z-chrome);
+  max-width: calc(100% - 2 * (var(--chrome-gap) + var(--bar-h) + var(--sp-2)));
+  margin: 0 0 calc(var(--chrome-gap) + var(--dock-safe, var(--safe-bottom))) 0;
+  pointer-events: auto;
+}
+html[data-source="open"] #dock { --dock-safe: 0px; }
+#dock > .capsule {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+#dock > .capsule::-webkit-scrollbar { display: none; }
+html[data-mode="view"] #dock { display: none; }
+@media (min-width: 640px) {
+  .topbar__slot--lead { max-width: min(36rem, calc(100% - 2 * var(--chrome-gap))); }
+  .topbar__slot--lead > .capsule { flex: 0 1 auto; max-width: 100%; }
+  /* The projects button leads the dock; a hairline after it parts the
+     places from the actions. */
+  #topbar-actions > #sidebar-toggle { margin-right: var(--sp-1); }
+  #topbar-actions > #sidebar-toggle::before {
+    content: "";
+    position: absolute;
+    top: 25%;
+    bottom: 25%;
+    right: calc(-1 * var(--sp-1) / 2 - 0.5px);
+    width: 1px;
+    background: var(--glass-rim);
+  }
+}
+
 /* ---------------------------------------------------------------- zoom capsule */
 
 /* Thin glass over the stage's bottom-right corner. A grid item in the stage's
@@ -367,6 +439,8 @@
   position: relative;
   z-index: var(--z-chrome);
   margin: 0 max(var(--chrome-gap), var(--safe-right)) calc(var(--chrome-gap) + var(--zoom-safe, var(--safe-bottom))) 0;
+  /* Upright at the right edge: the dock owns the foot of the map. */
+  flex-direction: column;
 }
 html[data-source="open"] #zoombar { --zoom-safe: 0px; }
 @media (max-width: 639px) {

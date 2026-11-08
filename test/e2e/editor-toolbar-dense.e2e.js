@@ -462,7 +462,10 @@ module.exports = async function (t) {
   await E.settled(page);
   var z = await page.evaluate(sweep, { paths: lifted.upper, reveal: false });
   verdict(t, z);
-  t.check('docked in the capsules\' row at least once', (z.rows['top-chrome'] || 0) > 0, z);
+  /* Layout v3: the title capsule stands alone at the top centre, so the row
+   * beside it is as good as the row under it: the bar docks at the top edge,
+   * in one or the other, covering nothing (verdict above). */
+  t.check('docked at the top edge, in the capsule\'s row or just under it', (z.rows['top-chrome'] || 0) + (z.rows['top-inside'] || 0) > 0, z);
   var inRow = Object.keys(z.rowOf).filter(function (p) { return z.rowOf[p] === 'top-chrome'; });
   if (inRow.length) {
     await page.evaluate(function (p) { window.MindRoot.session.select(p, { reveal: false, animate: false }); }, inRow[0]);

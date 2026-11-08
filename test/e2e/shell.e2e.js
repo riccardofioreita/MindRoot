@@ -142,9 +142,10 @@ module.exports = async function (t) {
     var C = window.MindRoot.commands;
     var B = window.MindRoot.shell.bars;
     function filled(slots) { return slots.filter(function (s) { return s.ids.some(function (id) { return C.has(id); }); }).length; }
-    return { slots: filled(B.top), buttons: document.querySelectorAll('#topbar-actions .btn').length, more: document.querySelectorAll('#topbar-actions .btn--more').length };
+    return { slots: filled(B.top), buttons: document.querySelectorAll('#topbar-actions .btn:not(#sidebar-toggle)').length, more: document.querySelectorAll('#topbar-actions .btn--more').length, toggle: !!document.querySelector('#topbar-actions > #sidebar-toggle') };
   });
   t.eq(plan.buttons, plan.slots + 1, 'one button per filled slot, plus "more"');
+  t.eq(plan.toggle, true, 'the projects button leads the dock');
   t.eq(plan.more, 1, 'and "more" is last but always there');
   await page.evaluate(function () {
     var B = window.MindRoot.shell.bars;
@@ -367,10 +368,11 @@ module.exports = async function (t) {
   var dt = await page.evaluate(function () {
     var lead = document.getElementById('topbar-lead').getBoundingClientRect();
     var actions = document.getElementById('topbar-actions').getBoundingClientRect();
-    return { leadRight: lead.right, actionsLeft: actions.left, scroll: document.scrollingElement.scrollWidth, w: window.innerWidth };
+    return { leadLeft: lead.left, leadRight: lead.right, leadBottom: lead.bottom, actionsTop: actions.top, scroll: document.scrollingElement.scrollWidth, w: window.innerWidth };
   });
   await page.evaluate(function () { window.__restoreStore(); });
-  t.check('the title capsule stops before the actions', dt.leadRight <= dt.actionsLeft && dt.scroll <= dt.w, dt);
+  /* Layout v3: the title floats alone at the top left, the dock at the foot. */
+  t.check('the title capsule stays bounded, clear of the dock', dt.leadRight - dt.leadLeft <= 577 && dt.leadBottom < dt.actionsTop && dt.scroll <= dt.w, dt);
 
   t.step('liquid glass: optional, on the top capsules only, cleanly undone');
   await H.until(page, function () { return document.documentElement.getAttribute('data-glass') === 'liquid'; }, null, 5000);

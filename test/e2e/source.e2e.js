@@ -224,10 +224,11 @@ module.exports = async function (t) {
     var toast = document.querySelector('.toast:not([hidden])').getBoundingClientRect();
     var src = document.getElementById('source').getBoundingClientRect();
     var stage = document.getElementById('stage').getBoundingClientRect();
-    var zoom = document.getElementById('zoombar').getBoundingClientRect();
-    return { toastBottom: toast.bottom, srcTop: src.top, mid: (toast.left + toast.right) / 2, stageMid: (stage.left + stage.right) / 2, zoomTop: zoom.top };
+    var dock = document.getElementById('topbar-actions').getBoundingClientRect();
+    return { toastBottom: toast.bottom, srcTop: src.top, mid: (toast.left + toast.right) / 2, stageMid: (stage.left + stage.right) / 2, dockTop: dock.top };
   });
-  t.check('above the Markdown panel and the zoom bar, in the middle of the map', placed.toastBottom <= placed.srcTop && placed.toastBottom <= placed.zoomTop && Math.abs(placed.mid - placed.stageMid) < 2, placed);
+  /* Layout v3: the dock lies at the foot of the map; the toast above it. */
+  t.check('above the Markdown panel and the dock, in the middle of the map', placed.toastBottom <= placed.srcTop && placed.toastBottom <= placed.dockTop && Math.abs(placed.mid - placed.stageMid) < 2, placed);
 
   t.step('Mod+M closes it again');
   await page.keyboard.press('Control+M');
