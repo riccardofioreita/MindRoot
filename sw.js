@@ -21,7 +21,7 @@
 
 'use strict';
 
-var VERSION = '2.0.0-4';
+var VERSION = '2.1.0-1';
 var PREFIX = 'mindroot2-';
 var CACHE = PREFIX + VERSION;
 
@@ -54,6 +54,7 @@ var OPTIONAL = [
   'css/ai.css',
   'css/mentions.css',
   'css/workspace.css',
+  'css/liquid.css',
   'css/fonts/montserrat-latin.woff2',
   'js/model/color.js',
   'js/model/doc.js',

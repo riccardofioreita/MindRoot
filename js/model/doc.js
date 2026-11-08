@@ -4521,7 +4521,18 @@ window.MindRoot = window.MindRoot || {};
     if (!entry) return [];
     var links = collectLinks(tokenize(splitBox(entry.title).label, true, 0, null), []);
     bodyView(state, entry, links);
+    /* The links written in its notes open from the node too: a note that
+     * says "From [[Another map]]" leads there. */
+    ['node', 'edge'].forEach(function (kind) {
+      var note = entry.notes && entry.notes[kind];
+      if (note && note.text) collectLinks(tokenize(String(note.text), true, 0, null), links);
+    });
     return links;
+  }
+
+  /* The links in a piece of inline Markdown: [text](url) and [[Map]]. */
+  function inlineLinks(markdown) {
+    return collectLinks(tokenize(String(markdown == null ? '' : markdown), true, 0, null), []);
   }
 
   /* A key for a node that survives edits elsewhere: the words from the root
@@ -4668,6 +4679,7 @@ window.MindRoot = window.MindRoot || {};
     moveTo: moveTo,
     canMoveTo: canMoveTo,
     linksOf: linksOf,
+    inlineLinks: inlineLinks,
     isDrawingPath: isDrawingPath,
     lineageKey: lineageKey,
     lineageKeys: lineageKeys,

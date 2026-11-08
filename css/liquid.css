@@ -1,0 +1,291 @@
+/* MindRoot - liquid: the materials of the "Liquid" visual language (v2).
+ *
+ * Loaded after every component sheet and before motion.css, it repaints the
+ * surfaces and leaves the geometry alone: sizes, gaps and targets stay what
+ * the component sheets (and their tests) say, so nothing moves under a
+ * finger. Every value is a token from tokens.css.
+ *
+ * The recipe of a liquid surface, from the back:
+ *   1. the backdrop, blurred, saturated and brightened a little;
+ *   2. a clear tint (--g-tint), thin enough to let colour through;
+ *   3. a sheen across the top (::before, --glass-sheen);
+ *   4. a specular rim, bright top left and fading round the edge (::after,
+ *      a 1px gradient border cut out with a mask);
+ *   5. an inner glow and a long soft shadow (box-shadow).
+ * The pseudo-elements take no pointer events and sit under the content
+ * (z-index -1 inside an isolated surface), so they never cover a control.
+ *
+ * Fallbacks are the component sheets' own: without backdrop-filter, with
+ * reduced transparency or more contrast, every surface is solid paper and
+ * the sheen and the rim are off. Forced colours: system colours only. */
+
+/* ================================================================ the page */
+
+/* The light the glass floats in: two faint washes in the window's corners.
+   The map paper (body) keeps its exact colour; the washes sit on #app. */
+#app { background-color: var(--paper); background-image: var(--ambient); background-attachment: fixed; }
+#stage { background: transparent; }
+
+/* ================================================================ glass */
+
+.glass,
+.ink__bar,
+.note-bubble {
+  isolation: isolate;
+}
+
+.glass {
+  -webkit-backdrop-filter: blur(var(--g-blur)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
+  backdrop-filter: blur(var(--g-blur)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
+  box-shadow: var(--glass-glow), var(--glass-shadow);
+}
+
+.glass::before,
+.glass::after,
+.ink__bar::before,
+.ink__bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.glass::before,
+.ink__bar::before { background: var(--glass-sheen); opacity: 0.9; }
+.glass::after,
+.ink__bar::after {
+  padding: 1px;
+  background: var(--glass-edge);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* A surface that is not positioned would let its rim escape to the next
+   positioned ancestor. No weight (:where): a component that places its
+   surface absolutely or fixed keeps its own position. */
+:where(.glass) { position: relative; }
+
+/* The optional refraction brings its own blur and edge. */
+.glass.is-liquid::before,
+.glass.is-liquid::after { display: none; }
+
+/* Capsules: a touch more air and a crisper rim. */
+.capsule.glass { box-shadow: var(--glass-glow), var(--glass-shadow); }
+
+/* ================================================================ buttons */
+
+.btn {
+  transition-property: background-color, color, box-shadow, transform, filter;
+}
+.btn--text {
+  background: color-mix(in srgb, var(--paper-sunken) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--glass-rim);
+}
+.btn--primary {
+  background-color: var(--accent);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white) 0%, var(--accent) 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 1px 2px rgb(20 22 28 / 0.12), 0 4px 12px -2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.btn--danger {
+  background-color: var(--danger);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--danger) 88%, white) 0%, var(--danger) 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.24), 0 4px 12px -2px color-mix(in srgb, var(--danger) 40%, transparent);
+}
+/* Toggled on: a lit pill of accent glass. */
+.btn[aria-pressed="true"],
+.btn[aria-expanded="true"].btn--toggle {
+  background-color: var(--accent);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 85%, white) 0%, var(--accent) 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.30), 0 2px 8px -2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.btn--primary:disabled,
+.btn--primary[aria-disabled="true"],
+.btn--danger:disabled,
+.btn--danger[aria-disabled="true"] { background-color: var(--paper-sunken); background-image: none; box-shadow: none; }
+/* Pressed: the surface gives a little under the finger (Emil Kowalski's
+   0.97, never less: a button that shrinks more reads as broken). */
+.btn:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(0.97); }
+.btn__badge { box-shadow: 0 0 0 2px var(--paper-raised); }
+
+/* ================================================================ sidebar */
+
+#sidebar {
+  background: color-mix(in srgb, var(--paper-raised) 78%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-sat));
+  border-right-color: var(--glass-rim);
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.35);
+}
+@media (max-width: 1023px) {
+  html[data-sidebar="open"] #sidebar,
+  html[data-sidebar-drag] #sidebar { box-shadow: var(--glass-glow), var(--shadow-lift); }
+}
+.sb-row { border-radius: var(--r-control); }
+.sb-item.is-active > .sb-row {
+  background: linear-gradient(90deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 40%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* ================================================================ menus, popovers, tooltips */
+
+.menu:not(.glass),
+.popover:not(.glass) {
+  background: color-mix(in srgb, var(--paper-raised) 92%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  box-shadow: inset 0 0 0 1px var(--glass-rim), var(--glass-glow), var(--shadow-md);
+}
+.menu.menu--sheet { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.menu__item:focus,
+.menu__item[data-active] { background: color-mix(in srgb, var(--accent) 10%, var(--hover)); }
+
+.tooltip {
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--inverse) 88%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-sat));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), var(--shadow-sm);
+}
+
+/* ================================================================ toasts */
+
+.toast {
+  border-radius: var(--r-capsule);
+  background: color-mix(in srgb, var(--inverse) 86%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), inset 0 0 0 1px rgb(255 255 255 / 0.06), var(--shadow-md);
+}
+
+/* ================================================================ dialogs, sheets, panels, palette */
+
+.dialog,
+.palette,
+.panel,
+.sheet {
+  background: color-mix(in srgb, var(--paper-raised) 90%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-sat));
+  box-shadow: inset 0 0 0 1px var(--glass-rim), var(--glass-glow), var(--shadow-lift);
+}
+.dialog::backdrop,
+.palette::backdrop,
+.sheet[data-modal]::backdrop {
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  backdrop-filter: blur(6px) saturate(120%);
+}
+.sheet__grip { background: color-mix(in srgb, var(--ink) 22%, transparent); }
+
+/* ================================================================ fields */
+
+.input,
+.textarea,
+.select {
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  box-shadow: inset 0 1px 2px rgb(20 22 28 / 0.05);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  background: var(--paper);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* ================================================================ the map's bars and bubbles */
+
+.note-bubble {
+  background: color-mix(in srgb, var(--paper-raised) 88%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur-regular)) saturate(var(--glass-sat));
+  border-color: var(--glass-rim);
+  border-radius: var(--r-popover);
+  box-shadow: var(--glass-glow), var(--shadow-md);
+}
+
+/* The links written in a note (js/map/notes.js): chips that follow them. */
+.note-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  padding: var(--sp-1) 0;
+}
+.note-links__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: calc(var(--control-h) - 4px);
+  max-width: 100%;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-capsule);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.note-links__link > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-links__link .icon { width: var(--icon-sm); height: var(--icon-sm); }
+@media (hover: hover) and (pointer: fine) {
+  .note-links__link:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+}
+.note-links__link:active { transform: scale(0.97); }
+
+/* ================================================================ the drawing editor */
+
+.ink__bar {
+  -webkit-backdrop-filter: blur(var(--glass-blur-regular, 22px)) saturate(var(--glass-sat, 190%)) brightness(var(--glass-bright, 1));
+  backdrop-filter: blur(var(--glass-blur-regular, 22px)) saturate(var(--glass-sat, 190%)) brightness(var(--glass-bright, 1));
+}
+.ink__pop { border-radius: var(--r-popover, 18px); }
+
+/* ================================================================ fallbacks */
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  #sidebar, .menu:not(.glass), .popover:not(.glass), .dialog, .palette, .panel, .sheet, .note-bubble { background: var(--paper-raised); }
+  .toast, .tooltip { background: var(--inverse); }
+  .glass::before, .glass::after, .ink__bar::before, .ink__bar::after { display: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-transparency]) :is(#sidebar, .menu:not(.glass), .popover:not(.glass), .dialog, .palette, .panel, .sheet, .note-bubble) {
+    background: var(--paper-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  :root:not([data-transparency]) :is(.toast, .tooltip) { background: var(--inverse); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root:not([data-transparency]) :is(.glass, .ink__bar)::before,
+  :root:not([data-transparency]) :is(.glass, .ink__bar)::after { display: none; }
+  :root:not([data-transparency]) #app { background-image: none; }
+  :root:not([data-transparency]) .glass { background: var(--paper-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+:root[data-transparency="reduce"] :is(#sidebar, .menu:not(.glass), .popover:not(.glass), .dialog, .palette, .panel, .sheet, .note-bubble) {
+  background: var(--paper-raised);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-transparency="reduce"] :is(.toast, .tooltip) { background: var(--inverse); -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-transparency="reduce"] :is(.glass, .ink__bar)::before,
+:root[data-transparency="reduce"] :is(.glass, .ink__bar)::after { display: none; }
+:root[data-transparency="reduce"] #app { background-image: none; }
+:root[data-transparency="reduce"] .glass { background: var(--paper-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (prefers-contrast: more) {
+  :is(#sidebar, .menu:not(.glass), .popover:not(.glass), .dialog, .palette, .panel, .sheet, .note-bubble) {
+    background: var(--paper-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass { -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 0 0 1px var(--line-control), var(--shadow-sm); }
+  :is(.glass, .ink__bar)::before, :is(.glass, .ink__bar)::after { display: none; }
+  #app { background-image: none; }
+}
+@media (forced-colors: active) {
+  :is(.glass, .ink__bar)::before, :is(.glass, .ink__bar)::after { display: none; }
+  #app { background: Canvas; }
+  .btn--primary, .btn--danger, .btn[aria-pressed="true"] { background: ButtonText; color: ButtonFace; box-shadow: none; }
+}
+@media print {
+  #app { background: none; }
+  :is(.glass, .ink__bar)::before, :is(.glass, .ink__bar)::after { display: none; }
+}

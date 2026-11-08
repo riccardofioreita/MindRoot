@@ -206,6 +206,8 @@ window.MindRoot = window.MindRoot || {};
       'aichat.unchanged': '… {n} lines unchanged',
       'aichat.apply': 'Apply the changes',
       'aichat.createMap': 'Create the map',
+      'aichat.splitMaps': 'As separate maps',
+      'aichat.madeMaps': 'A map with links to {n} maps: {name}',
       'aichat.applied': 'The map “{name}” is changed. Undo takes it back.',
       'aichat.changedSince': 'The map changed since: look at the changes again before applying them.',
       'aichat.gone': 'That map is not there any more.',
@@ -332,6 +334,8 @@ window.MindRoot = window.MindRoot || {};
       'aichat.unchanged': '… {n} righe uguali',
       'aichat.apply': 'Applica le modifiche',
       'aichat.createMap': 'Crea la mappa',
+      'aichat.splitMaps': 'Come mappe separate',
+      'aichat.madeMaps': 'Una mappa con i link a {n} mappe: {name}',
       'aichat.applied': 'La mappa «{name}» è cambiata. Annulla la riporta indietro.',
       'aichat.changedSince': 'La mappa è cambiata nel frattempo: riguarda le modifiche prima di applicarle.',
       'aichat.gone': 'Quella mappa non c\'è più.',
@@ -1035,7 +1039,10 @@ window.MindRoot = window.MindRoot || {};
     return pid && st && st.project && st.project(pid) ? pid : null;
   }
 
-  function makeMap(outline) {
+  /* split: every first-level branch becomes a map of its own in the
+   * project, linked from the central map (store.splitBranches); the map and
+   * its branches are made in one undo step. */
+  function makeMap(outline, split) {
     var S = ns.session;
     var st = ns.store;
     var pid = openProject();
@@ -1057,9 +1064,28 @@ window.MindRoot = window.MindRoot || {};
       var got = D.addOutline(D.parse(text), '', nodes, 'ai');
       if (got) text = got.result.text;
     }
-    var made = st.createMap(pid, { name: name, text: text, label: 'aichat.label.map' });
+    /* Split: the [[links]] back to the central map must name it alone. */
+    if (split) {
+      var taken = (st.project(pid).maps || []).map(function (m) { return String(m.name || '').toLowerCase(); });
+      var base = name;
+      for (var k = 2; taken.indexOf(name.toLowerCase()) >= 0; k++) name = base + ' ' + k;
+    }
+    var made = null;
+    var parts = null;
+    var build = function () {
+      made = st.createMap(pid, { name: name, text: text, label: 'aichat.label.map' });
+      if (made && split && typeof st.splitBranches === 'function') {
+        var tree = D.parse(made.text);
+        var root = tree.byPath[''];
+        var kids = root && root.children ? root.children.map(function (k) { return k.path; }) : [];
+        if (kids.length) parts = st.splitBranches(pid, made.id, kids);
+      }
+    };
+    if (split && typeof st.transaction === 'function') st.transaction('aichat.label.map', build);
+    else build();
     if (made) {
-      ns.ui.toast(t('aichat.madeMap', { name: made.name || name }));
+      if (parts && parts.count) ns.ui.toast(t('aichat.madeMaps', { n: parts.count, name: made.name || name }));
+      else ns.ui.toast(t('aichat.madeMap', { name: made.name || name }));
       if (S && S.open) S.open(pid, made.id);
     }
     return made;
@@ -1651,6 +1677,14 @@ window.MindRoot = window.MindRoot || {};
     mapBtn.setAttribute('data-act', 'map');
     actions.appendChild(addBtn);
     actions.appendChild(mapBtn);
+    /* Several branches: each can be a map of its own in the project. */
+    var heads = outline.title !== null ? outline.nodes : (outline.nodes.length === 1 ? outline.nodes[0].children || [] : outline.nodes);
+    if (heads.length >= 2) {
+      var splitBtn = ns.ui.button({ label: t('aichat.splitMaps'), kind: 'text', icon: 'map', onClick: function () { makeMap(outline, true); } });
+      splitBtn.setAttribute('data-act', 'split');
+      splitBtn.disabled = !editable();
+      actions.appendChild(splitBtn);
+    }
     card.appendChild(actions);
     return card;
   }

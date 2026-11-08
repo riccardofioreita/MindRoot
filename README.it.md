@@ -13,6 +13,7 @@ Ogni mappa è un file `.md` che puoi leggere e modificare anche in Obsidian, VS 
 
 ## Indice
 
+- [L'aspetto](#laspetto)
 - [Come aprirlo](#come-aprirlo)
 - [Mappe e Markdown](#mappe-e-markdown)
 - [Lavagne e quaderni](#lavagne-e-quaderni)
@@ -24,6 +25,10 @@ Ogni mappa è un file `.md` che puoi leggere e modificare anche in Obsidian, VS 
 - [Limiti onesti](#limiti-onesti)
 - [Sviluppo](#sviluppo)
 - [Crediti e licenze](#crediti-e-licenze)
+
+## L'aspetto
+
+L'interfaccia di MindRoot è disegnata in **vetro liquido**: barre, menu, pannelli e fogli sono vetro trasparente con un bordo speculare e un riflesso morbido, sospesi su una pagina illuminata da una luce ambientale tenue (`css/liquid.css`, token in `css/tokens.css`). La mappa - carta, inchiostro, colori dei rami - non cambia, quindi ciò che ha significato si legge esattamente come prima. Trasparenza ridotta (Impostazioni o sistema), contrasto elevato e colori forzati danno superfici piene.
 
 ## Come aprirlo
 
@@ -42,6 +47,8 @@ Niente installazione, niente build, nessun server tuo:
 - **Testo sotto un nodo** (con elenchi puntati, numerati e da spuntare), note sul nodo e sulla sua linea, caselle da spuntare, link al web e ad altre mappe (`[[Un'altra mappa]]`), menzioni di qualsiasi nodo del progetto (`@`), immagini e disegni.
 - **Il pannello Markdown** (Ctrl+M) mostra la stessa mappa come testo; i due restano allineati mentre scrivi, e una modifica riscrive solo le righe che la riguardano.
 - **I progetti** raggruppano le mappe, ognuno con le sue immagini, il suo cestino e le sue copie a orario. Ctrl+K trova qualsiasi comando, posto o nodo di qualsiasi mappa.
+- **Una mappa per argomento.** Quando una mappa cresce in più argomenti, "Trasforma il ramo in una mappa" (menu del nodo) o "Dividi i rami in mappe" (menu del nodo centrale) sposta i rami in mappe a sé nel progetto: ogni ramo resta come `[[link]]` che apre la sua mappa, il nodo centrale della nuova mappa ha una nota con il link di ritorno, e un solo Annulla riporta tutto com'era. La chat AI può creare una proposta direttamente "Come mappe separate".
+- **I link nelle note funzionano.** Un `[[mappa]]` o un indirizzo web scritto in una nota si apre dalla nota stessa (un'etichetta sotto il testo) e dai link del nodo.
 - **Esporta** una mappa come SVG (con il font dentro), PNG (che porta con sé la mappa: rilascialo su MindRoot e torna una mappa), PDF (vettoriale, dalla stampa) o Markdown.
 - **Non si perde nulla.** Una sola cronologia di annullamento per tutto, un cestino in ogni progetto (rami, immagini, disegni, note, mappe) e copie di ogni mappa cambiata, fatte a orario o a mano, con le modifiche evidenziate prima di tornare a una di esse.
 
@@ -54,6 +61,7 @@ Ogni mappa ha una **lavagna** (Mappa | Lavagna, Ctrl+Maiusc+L), e ogni nodo può
 - **Tele infinite** (il default) o **pagine di formato fisso** (da A3 ad A6, B5, Letter, Legal, quadrato, 16:9, 4:3, iPad o qualsiasi misura in mm).
 - **30 carte**: puntini, quadretti, righe, rigature scolastiche, appunti Cornell, carta millimetrata, logaritmica e polare, pentagrammi, wireframe, agende, guide di calligrafia, o un'immagine tua.
 - **Strumenti**: penna, matita, pennarello, pennello ed evidenziatore sensibili alla pressione, forme, frecce, testo, immagini, selezione e una gomma per parte di un tratto, un tratto intero o un'area. L'inchiostro segue il tema.
+- **Puntatore laser** (solo penna): il pulsante con punto e raggi accanto alla penna, oppure Inchiostro | Laser nelle opzioni della penna. La penna lascia una scia rossa che svanisce entro un secondo - per presentare o indicare durante una chiamata - e non disegna nulla: nessun tratto, nessun salvataggio, nessun passo di annullamento. Qualsiasi altro strumento lo spegne.
 - **Pagine e tele** con le miniature per aggiungere, duplicare, riordinare e ripristinare; **esporta** un PDF di tutte le pagine o un PNG di una.
 
 Un quaderno è una cartella del progetto (`assets/<nome>.book/`) con un `book.json` e un SVG per pagina: ogni pagina si legge anche fuori da MindRoot e porta dentro il suo disegno modificabile.

@@ -13,6 +13,7 @@ Every map is a `.md` file you can also read and edit in Obsidian, VS Code or any
 
 ## Contents
 
+- [The look](#the-look)
 - [Opening it](#opening-it)
 - [Maps and Markdown](#maps-and-markdown)
 - [Boards and notebooks](#boards-and-notebooks)
@@ -24,6 +25,10 @@ Every map is a `.md` file you can also read and edit in Obsidian, VS Code or any
 - [Honest limits](#honest-limits)
 - [Development](#development)
 - [Credits and licences](#credits-and-licences)
+
+## The look
+
+MindRoot's interface is drawn in **liquid glass**: the bars, menus, panels and sheets are clear glass with a specular rim and a soft sheen, floating over a page lit by faint ambient light (`css/liquid.css`, tokens in `css/tokens.css`). The map itself - paper, ink, branch colours - is untouched, so what carries meaning reads exactly as before. Reduce transparency (Settings, or the system's), more contrast and forced colours give solid surfaces.
 
 ## Opening it
 
@@ -42,6 +47,8 @@ No install step, no build, no server of your own:
 - **Words under a node** (with bulleted, numbered and to-do lists), notes on the node and on its line, boxes to tick, links to the web and to other maps (`[[Another map]]`), mentions of any node of the project (`@`), pictures and drawings.
 - **The Markdown panel** (Ctrl+M) shows the same map as text; both stay in step as you type, and an edit rewrites only the lines it is about.
 - **Projects** group maps, each with its own pictures, trash and timed copies. Ctrl+K finds any command, place or node of any map.
+- **One map per topic.** When a map grows into several topics, "Turn the branch into a map" (node menu) or "Split the branches into maps" (central node's menu) moves branches into maps of their own in the project: each branch stays behind as a `[[link]]` that opens its map, the new map's central node carries a note that links back, and one Undo takes it all back. The AI chat can make a proposal straight away "As separate maps".
+- **Links in notes work.** A `[[map]]` or a web address written in a note opens from the note itself (a chip under it) and from the node's links.
 - **Export** a map as SVG (with its font inside), PNG (which carries the map: drop it back on MindRoot and it is a map again), PDF (vector, through the print dialog) or Markdown.
 - **Nothing is lost.** One undo history for everything, a trash in every project (branches, pictures, drawings, notes, maps), and copies of every changed map taken by the clock or by hand, with the changes marked before you go back to one.
 
@@ -54,6 +61,7 @@ Every map has a **board** (Map | Board, Ctrl+Shift+L), and any node can have its
 - **Infinite canvases** (the default) or **fixed-size pages** (A3 to A6, B5, Letter, Legal, square, 16:9, 4:3, iPad or any size in mm).
 - **30 papers**: dots, squares, lines, school rulings, Cornell notes, millimetre, log and polar paper, music staves, wireframes, planners, calligraphy guides, or a picture of your own.
 - **Tools**: pen, pencil, marker, brush and highlighter with pressure, shapes, arrows, text, pictures, select and an eraser for part of a stroke, a whole stroke or an area. The ink follows the theme.
+- **Laser pointer** (pen only): the dot-and-rays button beside the pen, or Ink | Laser in the pen's options. The pen then leaves a red trail that fades within a second - for presenting or pointing during a call - and draws nothing: no stroke, no save, no undo step. Any other tool turns it off.
 - **Pages and canvases** with thumbnails to add, duplicate, reorder and restore; **export** as a PDF of every page or a PNG of one.
 
 A notebook is a folder of the project (`assets/<name>.book/`) with a `book.json` and one SVG per page: every page reads outside MindRoot too, and carries its editable drawing inside.
