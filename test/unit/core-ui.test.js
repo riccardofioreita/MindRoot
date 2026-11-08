@@ -531,15 +531,16 @@
     await T.until(settled(s.el), 2000, 'entered');
     var vh = window.innerHeight;
     var r = s.el.getBoundingClientRect();
-    T.eq(Math.round(r.height), Math.round(vh * 0.5), 'its height is the low rest');
+    /* It opens at its highest rest: everything in view, nothing to drag up. */
+    T.eq(Math.round(r.height), Math.round(vh * 0.92), 'its height is the top rest');
     T.eq(Math.round(r.bottom), vh, 'on the bottom edge');
     T.eq(s.el.style.translate, '', 'sized, not slid down');
-    T.eq(s.detent(), 0, 'the low rest');
-    T.eq(s.el.getAttribute('data-detent'), 'low', 'marked low');
+    T.eq(s.detent(), 1, 'the top rest');
+    T.eq(s.el.getAttribute('data-detent'), 'top', 'marked top');
     var foot = s.el.querySelector('.sheet__foot').getBoundingClientRect();
     T.ok(foot.bottom <= vh && foot.top >= r.top, 'the actions inside the visible part');
     var b = s.el.querySelector('.sheet__body');
-    T.eq(getComputedStyle(b).touchAction, 'none', 'at the low rest a swipe on the body moves the sheet');
+    T.eq(getComputedStyle(b).touchAction, 'auto', 'at the top rest the body scrolls');
     b.scrollTop = b.scrollHeight;
     var lines = b.querySelectorAll('p');
     T.ok(lines[lines.length - 1].getBoundingClientRect().bottom <= foot.top + 1, 'the last line can be scrolled into view');
