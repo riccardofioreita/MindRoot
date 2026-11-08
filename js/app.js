@@ -572,15 +572,12 @@ window.MindRoot = window.MindRoot || {};
       var r = el.getBoundingClientRect();
       if (r.height) out.top = Math.max(out.top, Math.round(r.bottom - stage.top + gap));
     });
-    /* The dock lies along the foot of the map; the zoom capsule, upright,
-     * along its right edge. */
+    /* The dock lies along the foot of the map. The zoom capsule, upright in
+     * the corner, is no inset: what is placed over the map steps round it
+     * as round any capsule (editor.js chromeBoxes). */
     if (els.actions && els.actions.offsetParent !== null) {
       var d = els.actions.getBoundingClientRect();
       if (d.height) out.bottom = Math.max(out.bottom, Math.round(stage.bottom - d.top + gap));
-    }
-    if (els.zoombar && !els.zoombar.hidden && els.zoombar.getClientRects().length) {
-      var z = els.zoombar.getBoundingClientRect();
-      if (z.height > z.width) out.right = Math.max(out.right, Math.round(stage.right - z.left + gap));
     }
     /* The format bar docked above the thumb bar (a phone writing a name)
      * covers the map as much as the thumb bar does: a node opened for

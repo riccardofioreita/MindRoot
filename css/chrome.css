@@ -363,6 +363,9 @@
      down to the thumb. */
   .topbar__slot--actions { display: none; }
   .topbar__slot--quick { display: flex; flex: none; margin-left: auto; }
+  /* Too narrow for both side by side (a 320px phone with Map | Board in the
+     title capsule): the quick capsule wraps under it, at the right. */
+  #topbar { flex-wrap: wrap; row-gap: var(--sp-2); }
   .topbar__slot--lead { flex: 0 1 auto; max-width: 100%; }
   .topbar__slot--lead > .capsule { flex: 0 1 auto; max-width: 100%; }
   .title[data-has-map] .title__project,
@@ -380,7 +383,8 @@
 
 /* ---------------------------------------------------------------- the dock */
 
-/* Layout v3: the title floats alone at the top centre; every action lives
+/* Layout v3: the title floats alone at the top left (the top right stays
+   free for a node's bar to dock in when the map is dense); every action lives
    in one glass dock at the foot of the map, centred; zoom stands upright at
    the right edge. A grid item in the stage's own cell, like the zoom
    capsule, so it rises with the map when the Markdown panel docks. Kept
@@ -407,7 +411,6 @@ html[data-source="open"] #dock { --dock-safe: 0px; }
 #dock > .capsule::-webkit-scrollbar { display: none; }
 html[data-mode="view"] #dock { display: none; }
 @media (min-width: 640px) {
-  #topbar { justify-content: center; }
   .topbar__slot--lead { max-width: min(36rem, calc(100% - 2 * var(--chrome-gap))); }
   .topbar__slot--lead > .capsule { flex: 0 1 auto; max-width: 100%; }
   /* The projects button leads the dock; a hairline after it parts the

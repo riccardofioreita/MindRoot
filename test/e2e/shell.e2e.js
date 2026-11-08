@@ -371,8 +371,8 @@ module.exports = async function (t) {
     return { leadLeft: lead.left, leadRight: lead.right, leadBottom: lead.bottom, actionsTop: actions.top, scroll: document.scrollingElement.scrollWidth, w: window.innerWidth };
   });
   await page.evaluate(function () { window.__restoreStore(); });
-  /* Layout v3: the title floats alone at the top centre, the dock at the foot. */
-  t.check('the title capsule stays centred and bounded, clear of the dock', dt.leadRight - dt.leadLeft <= 577 && Math.abs((dt.leadLeft + dt.leadRight) / 2 - dt.w / 2) < 200 && dt.leadBottom < dt.actionsTop && dt.scroll <= dt.w, dt);
+  /* Layout v3: the title floats alone at the top left, the dock at the foot. */
+  t.check('the title capsule stays bounded, clear of the dock', dt.leadRight - dt.leadLeft <= 577 && dt.leadBottom < dt.actionsTop && dt.scroll <= dt.w, dt);
 
   t.step('liquid glass: optional, on the top capsules only, cleanly undone');
   await H.until(page, function () { return document.documentElement.getAttribute('data-glass') === 'liquid'; }, null, 5000);

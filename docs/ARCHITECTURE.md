@@ -392,7 +392,7 @@ Regions (ids are the contract):
   #app (grid: sidebar | main)
     #sidebar           projects and maps; a column >= 1024 px, a drawer below
     #main
-      #topbar          the title capsule (project / map, save state), alone at the top centre from 640px; on phones also the menu button and a quick capsule top right (Markdown, AI chat, laser: BARS.quick in app.js)
+      #topbar          the title capsule (project / map, save state), alone at the top left from 640px (the top right stays free for a node's bar to dock in); on phones also the menu button and a quick capsule top right (Markdown, AI chat, laser: BARS.quick in app.js)
       #dock            (layout v3, from 640px) the actions capsule #topbar-actions at the foot of the stage, centred, a grid item of the stage's cell; the projects button (#sidebar-toggle, moved there by app.js placeToggle) leads it; hidden on phones (the thumb bar is their dock); #zoombar stands upright at the stage's right edge; insets() counts the dock at the bottom and the upright zoom at the right
       #stage           the map surface (mapview mounts here); position: relative; fills main
         #floaters      node toolbar, format bar, note bubble, colour picker, panels live here (clamped to the stage)

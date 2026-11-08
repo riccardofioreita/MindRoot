@@ -28,7 +28,7 @@ Ogni mappa è un file `.md` che puoi leggere e modificare anche in Obsidian, VS 
 
 ## L'aspetto
 
-**Un dock, la mappa al centro.** Il nome della mappa fluttua da solo in alto al centro; tutte le azioni - progetti, annulla e ripeti, Markdown, AI, chat, ricerca, Mappa | Lavagna e Altro - stanno in un unico dock di vetro ai piedi della mappa; zoom, adatta, laser e riordina stanno in verticale sul bordo destro; i progetti si aprono come un pannello di vetro sospeso. Su telefono il dock è la barra per il pollice, con Markdown, chat AI e laser a un tocco in alto a destra.
+**Un dock, la mappa al centro.** Il nome della mappa fluttua da solo in alto a sinistra; tutte le azioni - progetti, annulla e ripeti, Markdown, AI, chat, ricerca, Mappa | Lavagna e Altro - stanno in un unico dock di vetro ai piedi della mappa; zoom, adatta, laser e riordina stanno in verticale sul bordo destro; i progetti si aprono come un pannello di vetro sospeso. Su telefono il dock è la barra per il pollice, con Markdown, chat AI e laser a un tocco in alto a destra.
 
 L'interfaccia di MindRoot è disegnata in **vetro liquido**: barre, menu, pannelli e fogli sono vetro trasparente con un bordo speculare e un riflesso morbido, sospesi su una pagina illuminata da una luce ambientale tenue (`css/liquid.css`, token in `css/tokens.css`). La mappa - carta, inchiostro, colori dei rami - non cambia, quindi ciò che ha significato si legge esattamente come prima. Trasparenza ridotta (Impostazioni o sistema), contrasto elevato e colori forzati danno superfici piene.
 
