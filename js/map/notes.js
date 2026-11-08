@@ -33,6 +33,7 @@ window.MindRoot = window.MindRoot || {};
   var STRINGS = {
     en: {
       'notes.title.node': 'Note',
+      'notes.links': 'Links in the note',
       'notes.title.edge': 'Note on the link',
       'notes.placeholder.node': 'Write the note',
       'notes.placeholder.edge': 'What ties these two nodes together',
@@ -52,6 +53,7 @@ window.MindRoot = window.MindRoot || {};
       'notes.kw.toggleAll': 'notes cards show all open comments'
     },
     it: {
+      'notes.links': 'Link nella nota',
       'notes.title.node': 'Nota',
       'notes.title.edge': 'Nota sul collegamento',
       'notes.placeholder.node': 'Scrivi la nota',
@@ -176,7 +178,9 @@ window.MindRoot = window.MindRoot || {};
     el.hint = h('p', { class: 'note-bubble__hint' });
     el.corner = h('span', { class: 'note-bubble__resize', 'aria-hidden': 'true', title: t('notes.resize') });
     bubble.appendChild(head);
+    el.links = h('div', { class: 'note-links', role: 'group', 'aria-label': t('notes.links') });
     bubble.appendChild(el.text);
+    bubble.appendChild(el.links);
     bubble.appendChild(el.hint);
     bubble.appendChild(el.corner);
     /* Tab cycles inside the bubble: past its last control the keys would
@@ -185,6 +189,7 @@ window.MindRoot = window.MindRoot || {};
     floaters.appendChild(bubble);
 
     el.text.addEventListener('keydown', onTextKey);
+    el.text.addEventListener('input', function () { fillLinks(el.links, el.text.value); });
     el.text.addEventListener('focusout', onFocusOut);
     if (ns.float) {
       ns.float.attach(bubble, el.grip);
@@ -429,6 +434,28 @@ window.MindRoot = window.MindRoot || {};
     if (ns.ui.tooltip) ns.ui.tooltip(el.close, closeLabel);
     bubble.toggleAttribute('data-readonly', open_.readOnly);
     bubble.setAttribute('data-kind', kind);
+    fillLinks(el.links, text);
+  }
+
+  /* The links written in the note, as buttons that follow them: a [[Map]]
+   * opens that map of the project (or offers to make it), a web address
+   * opens in a new tab. The note is saved first. */
+  function fillLinks(box, text) {
+    if (!box) return;
+    box.textContent = '';
+    var D0 = D();
+    var links = D0 && typeof D0.inlineLinks === 'function' ? D0.inlineLinks(text) : [];
+    box.hidden = !links.length;
+    links.slice(0, 8).forEach(function (l) {
+      var b = h('button', { type: 'button', class: 'note-links__link', 'data-kind': l.kind });
+      if (ns.ui && ns.ui.icon) b.appendChild(ns.ui.icon(l.kind === 'map' ? 'map' : 'external'));
+      b.appendChild(h('span', { text: l.text || l.href }));
+      b.addEventListener('click', function () {
+        if (isOpen()) close(true);
+        if (ns.editor && typeof ns.editor.openLink === 'function') ns.editor.openLink(l.href, l.kind, l.node);
+      });
+      box.appendChild(b);
+    });
   }
 
   function openBubble(text) {
@@ -458,7 +485,10 @@ window.MindRoot = window.MindRoot || {};
         finish('save');
       }
     });
-    var body = h('div', { class: 'note-sheet' }, area);
+    var sheetLinks = h('div', { class: 'note-links', role: 'group', 'aria-label': t('notes.links') });
+    fillLinks(sheetLinks, text);
+    area.addEventListener('input', function () { fillLinks(sheetLinks, area.value); });
+    var body = h('div', { class: 'note-sheet' }, area, sheetLinks);
     var actions = [];
     if (!ro) {
       if (text) actions.push({ label: t('notes.delete'), icon: 'trash', kind: 'text', onClick: function () { finish('delete'); } });

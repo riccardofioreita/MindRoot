@@ -145,6 +145,8 @@ window.MindRoot = window.MindRoot || {};
       'editor.cmd.openLink': 'Open the link',
       'editor.cmd.openLinkTo': 'Open {text}',
       'editor.cmd.copyBranch': 'Copy the branch to a map',
+      'editor.cmd.toMap': 'Turn the branch into a map',
+      'editor.cmd.splitMap': 'Split the branches into maps',
       'editor.cmd.deselect': 'Deselect',
       'editor.help.deselect': 'Lets go of the node. With no node chosen, Tab and Shift+Tab move out of the map (with a node chosen they add a child and move it up a level).',
       'editor.cmd.menu': 'Node actions',
@@ -180,6 +182,8 @@ window.MindRoot = window.MindRoot || {};
       'editor.help.task': 'Puts a check box on the node, or takes it off. Tap the box on the map to tick it.',
       'editor.help.openLink': 'Opens the link the node carries. A link to [[another map]] opens that map.',
       'editor.help.copyBranch': 'Copies the node and everything under it into another map.',
+      'editor.help.toMap': 'Moves the node and everything under it into a new map of the project; here it stays as a link to that map, and the new map links back.',
+      'editor.help.splitMap': 'Turns every branch of the central node into a map of its own in the project, each linked from here and linking back.',
       'editor.help.navigate': 'The arrows move between the nodes you can see: up and down among siblings, left to the parent, right to the first child.',
       'editor.help.menu': 'Everything you can do to the selected node.',
       'editor.kw.addChild': 'new node child add insert',
@@ -195,6 +199,7 @@ window.MindRoot = window.MindRoot || {};
       'editor.kw.task': 'task todo check box',
       'editor.kw.link': 'link url web open map',
       'editor.kw.copy': 'copy branch map import',
+      'editor.kw.toMap': 'split extract branch new map link project',
       'editor.fmt.size': 'Size',
       'editor.fmt.sizeIs': 'Size: {size}',
       'editor.fmt.normal': 'Normal',
@@ -229,6 +234,9 @@ window.MindRoot = window.MindRoot || {};
       'editor.deleted': 'Branch deleted: {label}',
       'editor.rootStays': 'The central node stays: delete its branches one by one, or start a new map.',
       'editor.copied': 'Copied to {map}',
+      'editor.madeMaps.one': 'New map: {map}',
+      'editor.madeMaps.other': '{n} new maps in the project',
+      'editor.splitNothing': 'The central node has no branches to turn into maps.',
       'editor.copiedMd': 'Copied as Markdown: {label}',
       'editor.label.paste': 'paste',
       'editor.copyOpen': 'Open',
@@ -314,6 +322,8 @@ window.MindRoot = window.MindRoot || {};
       'editor.cmd.openLink': 'Apri il link',
       'editor.cmd.openLinkTo': 'Apri {text}',
       'editor.cmd.copyBranch': 'Copia il ramo in una mappa',
+      'editor.cmd.toMap': 'Trasforma il ramo in una mappa',
+      'editor.cmd.splitMap': 'Dividi i rami in mappe',
       'editor.cmd.deselect': 'Deseleziona',
       'editor.help.deselect': 'Lascia il nodo. Senza un nodo scelto, Tab e Maiusc+Tab escono dalla mappa (con un nodo scelto aggiungono un figlio e lo spostano su di un livello).',
       'editor.cmd.menu': 'Azioni sul nodo',
@@ -349,6 +359,8 @@ window.MindRoot = window.MindRoot || {};
       'editor.help.task': 'Mette una casella sul nodo, o la toglie. Tocca la casella sulla mappa per spuntarla.',
       'editor.help.openLink': 'Apre il link del nodo. Un link a [[un\'altra mappa]] apre quella mappa.',
       'editor.help.copyBranch': 'Copia il nodo e tutto quello che ha sotto in un\'altra mappa.',
+      'editor.help.toMap': 'Sposta il nodo e tutto quello che ha sotto in una nuova mappa del progetto; qui resta un link a quella mappa, e la nuova mappa rimanda qui.',
+      'editor.help.splitMap': 'Trasforma ogni ramo del nodo centrale in una mappa a sé nel progetto, ciascuna collegata da qui e con un link di ritorno.',
       'editor.help.navigate': 'Le frecce si spostano fra i nodi che vedi: su e giù fra i fratelli, a sinistra al genitore, a destra al primo figlio.',
       'editor.help.menu': 'Tutto quello che puoi fare al nodo scelto.',
       'editor.kw.addChild': 'new node child add insert nuovo nodo figlio aggiungi',
@@ -364,6 +376,7 @@ window.MindRoot = window.MindRoot || {};
       'editor.kw.task': 'task todo check box compito spunta casella',
       'editor.kw.link': 'link url web open map collegamento apri mappa',
       'editor.kw.copy': 'copy branch map import copia ramo mappa',
+      'editor.kw.toMap': 'split extract branch new map link project dividi estrai ramo nuova mappa progetto',
       'editor.fmt.size': 'Misura',
       'editor.fmt.sizeIs': 'Misura: {size}',
       'editor.fmt.normal': 'Normale',
@@ -398,6 +411,9 @@ window.MindRoot = window.MindRoot || {};
       'editor.deleted': 'Ramo eliminato: {label}',
       'editor.rootStays': 'Il nodo centrale resta: elimina i suoi rami uno alla volta, oppure crea una nuova mappa.',
       'editor.copied': 'Copiato in {map}',
+      'editor.madeMaps.one': 'Nuova mappa: {map}',
+      'editor.madeMaps.other': '{n} nuove mappe nel progetto',
+      'editor.splitNothing': 'Il nodo centrale non ha rami da trasformare in mappe.',
       'editor.copiedMd': 'Copiato come Markdown: {label}',
       'editor.label.paste': 'incolla',
       'editor.copyOpen': 'Apri',
@@ -1632,6 +1648,37 @@ window.MindRoot = window.MindRoot || {};
       });
     }
     return true;
+  }
+
+  /* ---------------------------------------------------------------- branches into maps of their own */
+
+  /* The chosen branches leave this map for maps of their own in the same
+   * project (store.splitBranches): each stays here as a [[link]] to its new
+   * map, which links back. One undo step; this map stays open. */
+  function toMaps(paths) {
+    var c = cur();
+    var st = store();
+    if (!c || !st || readOnly() || typeof st.splitBranches !== 'function') return false;
+    var res = st.splitBranches(c.projectId, c.mapId, paths);
+    if (!res || !res.count) return false;
+    if (ns.ui && ns.ui.toast) {
+      var first = res.maps[0];
+      var msg = res.count === 1 ? t('editor.madeMaps.one', { map: first.name }) : t('editor.madeMaps.other', { n: res.count });
+      ns.ui.toast(msg, { action: { label: t('editor.copyOpen'), run: function () { S().open(c.projectId, first.id); } } });
+    }
+    return true;
+  }
+
+  /* Every first-level branch: the children of the tree roots. */
+  function firstLevel() {
+    var c = cur();
+    if (!c) return [];
+    var out = [];
+    tops().forEach(function (p) {
+      var e = c.state.byPath[p];
+      if (e && e.children) e.children.forEach(function (k) { out.push(k.path); });
+    });
+    return out;
   }
 
   /* ================================================================ the rename */
@@ -3382,6 +3429,7 @@ window.MindRoot = window.MindRoot || {};
       item('node.dice', { checked: !!prefGet('diceColors', false) }),
       canBeTask(path) ? item('node.task', { label: e && e.task !== null && e.task !== undefined ? t('editor.cmd.taskOff') : t('editor.cmd.taskOn') }) : null,
       item('node.copyBranch', { anchor: anchor }),
+      treeRoot(path) ? item('map.splitBranches', { hideDisabled: true }) : item('node.toMap', { hideDisabled: true }),
       '-'
     ].concat(removalItems(path), [
       item('node.delete', { danger: true })
@@ -3429,6 +3477,7 @@ window.MindRoot = window.MindRoot || {};
       fold, item('node.indent'), item('node.outdent'), item('node.moveUp'), item('node.moveDown'),
       item('node.sideLeft', { hideDisabled: true }), item('node.sideRight', { hideDisabled: true }),
       item('node.copyBranch', { point: point }),
+      treeRoot(path) ? item('map.splitBranches', { hideDisabled: true }) : item('node.toMap', { hideDisabled: true }),
       '-'
     ], removalItems(path), [
       item('node.delete', { danger: true })
@@ -4324,6 +4373,22 @@ window.MindRoot = window.MindRoot || {};
       keywords: t('editor.kw.link'), help: 'editor.help.openLink',
       when: function (ctx) { return sel(ctx, false) && linksOf(selected()).length > 0; },
       run: function (ctx) { return openLinks(selected(), ctx && ctx.anchor); }
+    });
+    C.register({
+      id: 'node.toMap', label: 'editor.cmd.toMap', group: 'node', icon: 'map',
+      keywords: t('editor.kw.toMap'), help: 'editor.help.toMap',
+      when: function (ctx) { return edit(ctx, false) && !treeRoot(selected()); },
+      run: function () { return toMaps([selected()]); }
+    });
+    C.register({
+      id: 'map.splitBranches', label: 'editor.cmd.splitMap', group: 'map', icon: 'map',
+      keywords: t('editor.kw.toMap'), help: 'editor.help.splitMap',
+      when: function () { return editable() && !!cur() && firstLevel().length > 0; },
+      run: function () {
+        var list = firstLevel();
+        if (!list.length) { if (ns.ui && ns.ui.toast) ns.ui.toast(t('editor.splitNothing')); return false; }
+        return toMaps(list);
+      }
     });
     C.register({
       id: 'node.copyBranch', label: 'editor.cmd.copyBranch', group: 'node', icon: 'copy',

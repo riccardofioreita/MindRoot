@@ -856,3 +856,33 @@
   .ink__cursor,
   .ink__pen-ring { display: none !important; }
 }
+
+/* The laser pointer (pen tool only): a glowing red trail that fades within a
+   second and is never part of the drawing. Screen pixels, above the sheet. */
+.ink__laser {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--z-map-overlay, 10);
+  pointer-events: none;
+  overflow: visible;
+}
+.ink__laser[data-off] { display: none; }
+.ink__laser-glow,
+.ink__laser-core {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ink__laser-glow { stroke: rgb(255 59 48 / 0.35); stroke-width: 12; filter: blur(3px); }
+.ink__laser-core { stroke: #ff3b30; stroke-width: 3.5; }
+.ink__laser-dot { fill: #ff3b30; filter: drop-shadow(0 0 6px rgb(255 59 48 / 0.9)); }
+.ink[data-laser] .ink__surface { cursor: crosshair; }
+.ink__laser-btn[aria-pressed="true"] { color: #ff3b30; }
+@media (forced-colors: active) {
+  .ink__laser-core, .ink__laser-glow { stroke: Highlight; }
+  .ink__laser-dot { fill: Highlight; }
+}
+@media print { .ink__laser { display: none !important; } }
+.ink__btn.ink__laser-btn[hidden] { display: none; }

@@ -114,7 +114,10 @@ window.MindRoot = window.MindRoot || {};
       'store.label.purge.other': 'delete {n} for good',
       'store.label.emptyTrash': 'empty the trash',
       'store.label.importBranches.one': 'import a branch',
-      'store.label.importBranches.other': 'import {n} branches'
+      'store.label.importBranches.other': 'import {n} branches',
+      'store.label.splitBranches.one': 'turn a branch into a map',
+      'store.label.splitBranches.other': 'turn {n} branches into maps',
+      'store.splitFrom': 'From [[{map}]]'
     },
     it: {
       'store.untitledProject': 'Progetto senza titolo',
@@ -156,7 +159,10 @@ window.MindRoot = window.MindRoot || {};
       'store.label.purge.other': 'elimina per sempre {n} elementi',
       'store.label.emptyTrash': 'svuota il cestino',
       'store.label.importBranches.one': 'importa un ramo',
-      'store.label.importBranches.other': 'importa {n} rami'
+      'store.label.importBranches.other': 'importa {n} rami',
+      'store.label.splitBranches.one': 'trasforma un ramo in mappa',
+      'store.label.splitBranches.other': 'trasforma {n} rami in mappe',
+      'store.splitFrom': 'Da [[{map}]]'
     }
   };
   if (ns.i18n && typeof ns.i18n.add === 'function') ns.i18n.add(STRINGS);
@@ -2039,6 +2045,89 @@ window.MindRoot = window.MindRoot || {};
     return { count: count, anchorLine: anchor, mapId: target.id };
   }
 
+  /* Branches of a map turned into maps of their own, in the same project:
+   * each chosen node becomes the root of a new map (its words, its body and
+   * every node under it), and in the source map it stays as a single node
+   * that links to the new map ([[Name]]). The new map's root carries a note
+   * that links back. One undo step for the whole lot; the source map stays
+   * open. opts: { link: false } keeps the branches where they are and only
+   * copies them out. Returns { count, maps: [{ id, name, path }] }. */
+  function splitBranches(pid, mid, paths, opts) {
+    if (readOnly) return null;
+    opts = opts || {};
+    var D = ns.doc;
+    var p = getProject(pid);
+    var source = findMap(p, mid);
+    if (!source) return null;
+    var parsed = D.parse(source.text);
+    var chosen = (paths || []).filter(function (path) { return typeof path === 'string' && path !== '' && !!parsed.byPath[path]; });
+    /* A node chosen with one of its ancestors goes with the ancestor. */
+    chosen = chosen.filter(function (path, i) {
+      return chosen.indexOf(path) === i && !chosen.some(function (other) { return other !== path && path.indexOf(other + '.') === 0; });
+    });
+    /* A node that is nothing but a link to a map, with nothing under it,
+     * is already where a split would leave it. */
+    chosen = chosen.filter(function (path) {
+      var e = parsed.byPath[path];
+      return (e.children && e.children.length) || !/^\s*\[\[[^\]]+\]\]\s*$/.test(D.labelOf(e));
+    });
+    if (!chosen.length) return { count: 0, maps: [] };
+    /* Last in the file first: what is taken out of a later branch never
+     * moves the path of an earlier one. */
+    chosen.sort(function (a, b) { return parsed.byPath[b].start - parsed.byPath[a].start; });
+    var taken = {};
+    p.maps.forEach(function (m) { taken[m.name.toLowerCase()] = true; });
+    function freeName(base) {
+      var name = cleanName(base, t('store.untitledMap'));
+      var n = 2;
+      var out = name;
+      while (taken[out.toLowerCase()]) out = name + ' ' + (n++);
+      taken[out.toLowerCase()] = true;
+      return out;
+    }
+    var text = source.text;
+    var made = [];
+    chosen.forEach(function (path) {
+      var cur = D.parse(text);
+      var entry = cur.byPath[path];
+      if (!entry) return;
+      var name = freeName(D.plainText(entry));
+      /* The new map: the node as its root, its children as the branches. */
+      var mapText = D.emptyDocument(name);
+      var body = D.bodyFor(cur, path);
+      if (body) { var b = D.setBody(D.parse(mapText), '', body); if (b) mapText = b.text; }
+      (entry.children || []).forEach(function (child) {
+        var frag = D.extractBranch(cur, child.path).fragment;
+        var r = D.insertBranch(D.parse(mapText), '', Infinity, frag);
+        if (r) mapText = r.text;
+      });
+      var back = D.setNote(D.parse(mapText), '', 'node', t('store.splitFrom', { map: source.name }));
+      if (back) mapText = back.text;
+      made.unshift({ name: name, text: mapText, path: path });
+      if (opts.link === false) return;
+      /* The source: the children and the body go, the node links out. */
+      for (var i = (entry.children || []).length - 1; i >= 0; i--) {
+        var gone = D.remove(D.parse(text), entry.children[i].path);
+        if (gone) text = gone.text;
+      }
+      if (body) { var nb = D.setBody(D.parse(text), path, ''); if (nb) text = nb.text; }
+      var linked = D.rename(D.parse(text), path, '[[' + name + ']]');
+      if (linked) text = linked.text;
+    });
+    if (!made.length) return { count: 0, maps: [] };
+    var from = here();
+    var fresh = made.map(function (m) { return assign(makeMap(m.name, m.text), { name: m.name }); });
+    var next = updateIn(state, pid, function (proj) {
+      var maps = proj.maps.slice();
+      var at = indexOfMap(proj, mid) + 1;
+      if (text !== source.text) maps = maps.map(function (m) { return m.id === mid ? assign({}, m, { text: normalizeText(text) }) : m; });
+      maps.splice.apply(maps, [at, 0].concat(fresh));
+      return assign({}, proj, { maps: maps });
+    });
+    commit(next, { type: 'map:create', label: counted('store.label.splitBranches', fresh.length), projectId: pid, mapId: mid, fromWhere: from });
+    return { count: fresh.length, maps: fresh.map(function (m, i) { return { id: m.id, name: m.name, path: made[i].path }; }) };
+  }
+
   ns.store = {
     VERSION: VERSION,
     HISTORY_LIMIT: HISTORY_LIMIT,
@@ -2087,6 +2176,7 @@ window.MindRoot = window.MindRoot || {};
     exportProject: exportProject,
 
     createMap: createMap,
+    splitBranches: splitBranches,
     renameMap: renameMap,
     duplicateMap: duplicateMap,
     moveMap: moveMap,

@@ -733,7 +733,7 @@ module.exports = async function (t) {
       return (b.getAttribute('data-tool') || b.getAttribute('data-key')) + ':' + (c ? 'caret' : '-') + ':' + (b.getAttribute('aria-haspopup') || '-') + ':' + (b.getAttribute('aria-expanded') || '-');
     }).filter(Boolean).join(' ');
   });
-  t.eq(carets, 'select:-:-:- hand:-:-:- pen:caret:dialog:false eraser:caret:dialog:false rect:caret:dialog:false ellipse:caret:dialog:false diamond:caret:dialog:false line:caret:dialog:false arrow:caret:dialog:false text:caret:dialog:false ink.image.pick:-:-:- ink.style:caret:dialog:false',
+  t.eq(carets, 'select:-:-:- hand:-:-:- pen:caret:dialog:false ink.laser:-:-:- eraser:caret:dialog:false rect:caret:dialog:false ellipse:caret:dialog:false diamond:caret:dialog:false line:caret:dialog:false arrow:caret:dialog:false text:caret:dialog:false ink.image.pick:-:-:- ink.style:caret:dialog:false',
     'the chevron, aria-haspopup and aria-expanded on the buttons that hold more, and only there');
   var caretLook = await ev(function () {
     function at(sel) {

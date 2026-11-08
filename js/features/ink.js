@@ -244,6 +244,11 @@ window.MindRoot = window.MindRoot || {};
       'ink.tool.select': 'Select',
       'ink.tool.hand': 'Pan',
       'ink.tool.pen': 'Pen',
+      'ink.laser': 'Laser pointer (pen)',
+      'ink.laser.mode': 'The pen leaves',
+      'ink.laser.mode.ink': 'Ink',
+      'ink.laser.mode.laser': 'Laser',
+      'ink.laser.on': 'Laser pointer on: the pen leaves a trail that fades and draws nothing',
       'ink.tool.eraser': 'Eraser',
       'ink.tool.rect': 'Rectangle',
       'ink.tool.ellipse': 'Ellipse',
@@ -352,6 +357,11 @@ window.MindRoot = window.MindRoot || {};
       'ink.tool.select': 'Seleziona',
       'ink.tool.hand': 'Sposta la vista',
       'ink.tool.pen': 'Penna',
+      'ink.laser': 'Puntatore laser (penna)',
+      'ink.laser.mode': 'La penna lascia',
+      'ink.laser.mode.ink': 'Inchiostro',
+      'ink.laser.mode.laser': 'Laser',
+      'ink.laser.on': 'Puntatore laser attivo: la penna lascia una scia che svanisce e non disegna nulla',
       'ink.tool.eraser': 'Gomma',
       'ink.tool.rect': 'Rettangolo',
       'ink.tool.ellipse': 'Ellisse',
@@ -2126,6 +2136,7 @@ window.MindRoot = window.MindRoot || {};
     select: '<path d="M5.5 3.5l12.5 7-5.8 1.6-2.7 5.9z"/>',
     hand: '<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 10V4.5a1.5 1.5 0 0 1 3 0V11"/><path d="M14 10.5V6a1.5 1.5 0 0 1 3 0v6"/><path d="M17 9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-2.7L4.3 14.6a1.5 1.5 0 0 1 2.4-1.8L8 14.5"/>',
     pen: '<path d="M12 21v-3.5"/><path d="M8.5 13.5L12 3l3.5 10.5L12 17.5z"/><path d="M12 10.5v2"/>',
+    laser: '<circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 3.5v2.4M12 18.1v2.4M3.5 12h2.4M18.1 12h2.4M6 6l1.7 1.7M16.3 16.3L18 18M18 6l-1.7 1.7M7.7 16.3L6 18"/>',
     pencil: '<path d="M4 20l1.5-5.5L15.5 4.5l4 4-10 10z"/><path d="M5.5 14.5l4 4"/><path d="M13 7l4 4"/>',
     marker: '<path d="M9.5 15l-3.5 3.5V20h3.5l3.5-3.5"/><path d="M9.5 15l7-9.5a2 2 0 0 1 3 0l.5.5a2 2 0 0 1 0 3L13 16.5z"/>',
     brush: '<path d="M18.5 3.5l2 2-8 8-2-2z"/><path d="M10.5 11.5c-2.5 0-4 1.5-4 3.5 0 1.5-1 2.5-3 3 2 1.5 6 1.5 7.5-.5 1-1.3 1.5-2.5 1.5-4"/>',
@@ -2394,6 +2405,19 @@ window.MindRoot = window.MindRoot || {};
 
     var cursor = h('div', 'ink__cursor', { hidden: true, 'aria-hidden': 'true' });
     var nib = h('div', 'ink__pen-ring', { hidden: true, 'aria-hidden': 'true' });
+    /* The laser pointer: a trail of recent pen positions in screen pixels,
+     * drawn on a layer of its own above the sheet. It is never part of the
+     * drawing: nothing is committed, saved or put on the undo stack. */
+    var laserOn = false;
+    var laserSvg = svgEl('svg', { 'class': 'ink__laser', 'aria-hidden': 'true', 'data-off': '' });
+    var laserGlow = svgEl('path', { 'class': 'ink__laser-glow' });
+    var laserCore = svgEl('path', { 'class': 'ink__laser-core' });
+    var laserDot = svgEl('circle', { 'class': 'ink__laser-dot', r: '7' });
+    laserSvg.appendChild(laserGlow);
+    laserSvg.appendChild(laserCore);
+    laserSvg.appendChild(laserDot);
+    var laserTrail = [];
+    var laserFrame = 0;
     var ta = h('textarea', 'ink__text', {
       hidden: true, rows: '1', wrap: 'off', spellcheck: 'true',
       'aria-label': t('ink.textField'), placeholder: t('ink.textPlaceholder')
@@ -2490,6 +2514,12 @@ window.MindRoot = window.MindRoot || {};
     addTool('hand', 'ink__wide');
     toolsBar.appendChild(separator('ink__wide'));
     addTool('pen');
+    var laserBtn = button('ink__laser-btn ink__wide', 'ink.laser', 'laser', function () {
+      if (tool !== 'pen') { if (setTool('pen')) setLaser(true); }
+      else setLaser(!laserOn);
+    }, null, true);
+    laserBtn.setAttribute('aria-pressed', 'false');
+    toolsBar.appendChild(laserBtn);
     addTool('eraser');
     toolsBar.appendChild(separator('ink__wide'));
     SHAPES.forEach(function (name) { addTool(name, 'ink__wide'); });
@@ -2567,6 +2597,7 @@ window.MindRoot = window.MindRoot || {};
     root.appendChild(surface);
     root.appendChild(cursor);
     root.appendChild(nib);
+    root.appendChild(laserSvg);
     root.appendChild(ta);
     root.appendChild(toolsBar);
     root.appendChild(actionsBar);
@@ -3703,6 +3734,61 @@ window.MindRoot = window.MindRoot || {};
       return null;
     }
 
+    /* ---------------------------------------------------------------- laser pointer */
+
+    var LASER_LIFE = 700;
+
+    function laserPath(pts) {
+      if (pts.length < 2) return '';
+      var d = 'M' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+      for (var i = 1; i < pts.length; i++) d += 'L' + pts[i].x.toFixed(1) + ' ' + pts[i].y.toFixed(1);
+      return d;
+    }
+
+    function paintLaser() {
+      laserFrame = 0;
+      if (closed) return;
+      var t0 = now();
+      var held = !!(gesture && gesture.laser);
+      /* The head stays while the pen is down; the tail fades from behind. */
+      var last = laserTrail[laserTrail.length - 1];
+      laserTrail = laserTrail.filter(function (p) { return t0 - p.t < LASER_LIFE || (held && p === last); });
+      var keep = laserTrail;
+      if (!keep.length) {
+        laserSvg.setAttribute('data-off', '');
+        laserGlow.removeAttribute('d');
+        laserCore.removeAttribute('d');
+        return;
+      }
+      laserSvg.removeAttribute('data-off');
+      var d = laserPath(keep);
+      laserGlow.setAttribute('d', d);
+      laserCore.setAttribute('d', d);
+      var head = keep[keep.length - 1];
+      laserDot.setAttribute('cx', head.x.toFixed(1));
+      laserDot.setAttribute('cy', head.y.toFixed(1));
+      var age = held ? 0 : (t0 - head.t) / LASER_LIFE;
+      laserSvg.style.opacity = String(Math.max(0, 1 - age * age));
+      laserFrame = requestAnimationFrame(paintLaser);
+    }
+
+    function laserTo(clientX, clientY) {
+      laserTrail.push({ x: clientX - rect.left, y: clientY - rect.top, t: now() });
+      if (laserTrail.length > 400) laserTrail.splice(0, laserTrail.length - 400);
+      if (!laserFrame) laserFrame = requestAnimationFrame(paintLaser);
+    }
+
+    function setLaser(on) {
+      on = !!on && !readOnly;
+      if (on === laserOn) return;
+      laserOn = on;
+      laserTrail = [];
+      root.toggleAttribute('data-laser', on);
+      if (on) say(t('ink.laser.on'));
+      updateToolbar();
+      updateCursor();
+    }
+
     /* ---------------------------------------------------------------- tools */
 
     function setTool(name, keepSelection) {
@@ -3846,6 +3932,12 @@ window.MindRoot = window.MindRoot || {};
         if (on && (id === 'pen' || id === 'eraser' || id === 'text' || SHAPES.indexOf(id) >= 0)) label = t('ink.againForOptions', { label: label });
         tip(b, label, [TOOL_KEYS[id]]);
       });
+      var showLaser = tool === 'pen' && !readOnly;
+      if (!showLaser && laserOn) { laserOn = false; laserTrail = []; root.removeAttribute('data-laser'); }
+      laserBtn.disabled = readOnly;
+      laserBtn.setAttribute('aria-pressed', String(laserOn));
+      laserBtn.setAttribute('aria-label', t('ink.laser'));
+      tip(laserBtn, t('ink.laser'), null);
       var penBtn = toolButtons.pen;
       var penIcon = penBtn.querySelector('.ink__icon');
       if (penIcon.getAttribute('data-icon') !== s.pen) {
@@ -3886,7 +3978,7 @@ window.MindRoot = window.MindRoot || {};
     function refreshNibCursor() {
       var spec = null;
       var key = '';
-      if (tool === 'pen' && !readOnly && !(forcedQuery && forcedQuery.matches)) {
+      if (tool === 'pen' && !laserOn && !readOnly && !(forcedQuery && forcedQuery.matches)) {
         var preset = penById(s.pen) || PENS[0];
         var held = s.pens[s.pen] || preset;
         var bar = preset.id === 'highlighter';
@@ -4215,6 +4307,10 @@ window.MindRoot = window.MindRoot || {};
       }), s.pen, function (id) { choosePen(id); refreshPop(); }, t('ink.pens')));
       sec.appendChild(h('p', 'ink__note', { text: t('ink.penNote.' + s.pen) }));
       box.appendChild(sec);
+      box.appendChild(segmented(t('ink.laser.mode'), ['ink', 'laser'], laserOn ? 'laser' : 'ink', 'ink.laser.mode.', function (id) {
+        setLaser(id === 'laser');
+        refreshPop();
+      }));
       box.appendChild(colorSection());
       box.appendChild(sizeSection('pen'));
     }
@@ -4825,6 +4921,10 @@ window.MindRoot = window.MindRoot || {};
       finish(g);
       if (e && e.pointerType && e.pointerType !== 'touch' && e.clientX !== undefined) showNib(e.clientX, e.clientY);
       if (g.kind === 'draw') {
+        if (g.laser) {
+          paintAll();
+          return;
+        }
         var stroke = changed(g.draft, { points: g.points.slice() });
         g.draft = null;
         if (!commit(elements.concat([stroke]))) paintAll();
@@ -5046,6 +5146,15 @@ window.MindRoot = window.MindRoot || {};
     }
 
     function beginDraw(g, e) {
+      if (laserOn) {
+        g.laser = true;
+        g.points = [];
+        g.draft = null;
+        g.last = [e.clientX, e.clientY];
+        laserTrail = [];
+        laserTo(e.clientX, e.clientY);
+        return;
+      }
       var pen = penById(s.pen) || PENS[0];
       var mine = s.pens[pen.id];
       g.sim = g.pointerType !== 'pen';
@@ -5059,6 +5168,10 @@ window.MindRoot = window.MindRoot || {};
 
     function moveDraw(g, e) {
       var list = coalesced(e);
+      if (g.laser) {
+        for (var j = 0; j < list.length; j++) laserTo(list[j].clientX, list[j].clientY);
+        return;
+      }
       var added = false;
       for (var i = 0; i < list.length; i++) {
         var c = list[i];
