@@ -185,7 +185,7 @@ module.exports = async function (t) {
   await M.stroke(page, 60);
   var hp = await E.history(page);
   t.eq(await M.fileAsset(page, G), g1, 'held while drawing');
-  await page.click('#topbar [data-command="history.undo"]');
+  await page.click('#topbar-actions [data-command="history.undo"]');
   try { await E.until(page, function () { return window.MindRoot.store.historyState().redoCount > 0; }, null, 5000); } catch (err) { /* checked */ }
   var hq = await E.history(page);
   t.same([hq.count, hq.redo], [hp.count, 1], 'the stroke became a step and the undo took it back');

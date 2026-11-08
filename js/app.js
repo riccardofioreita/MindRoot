@@ -158,7 +158,7 @@ window.MindRoot = window.MindRoot || {};
   var MORE_GROUPS_WIDE = ['map', 'view', 'help'];
   var MORE_ADD_WIDE = ['file.import', 'export.open', 'export.markdown', 'settings.open'];
   var MORE_SKIP_WIDE = ['sidebar.newMap', 'map.rename', 'map.duplicate', 'map.importBranches', 'map.delete',
-    'view.zoomIn', 'view.zoomOut', 'view.fit', 'view.sidebar', 'welcome.sample'];
+    'view.zoomIn', 'view.zoomOut', 'view.fit', 'view.laser', 'view.sidebar', 'welcome.sample'];
 
   function addStrings() {
   i18n.add({
@@ -517,10 +517,25 @@ window.MindRoot = window.MindRoot || {};
     if (next === 'expanded') setSidebar(prefs.get('sidebarOpen'), { persist: false, focus: false });
     else setSidebar(false, { persist: false, focus: false });
     if (els.toggleUse) els.toggleUse.setAttribute('href', next === 'compact' ? '#i-menu' : '#i-sidebar');
+    placeToggle(next);
     renderBars();
     /* A bar that comes into sight with the new layout gets its Tab stop. */
     if (shell.rovingThumb) shell.rovingThumb.refresh();
     if (shell.rovingZoom) shell.rovingZoom.refresh();
+  }
+
+  /* The projects button: first in the dock wherever there is one (it opens
+   * the floating panel of projects), in the title capsule on a phone (the
+   * hamburger by the map's name). The same element moves, so its label,
+   * aria-expanded and every listener go with it. */
+  function placeToggle(layout) {
+    if (!els.toggle || !els.lead) return;
+    if (layout === 'compact') {
+      if (shell.toggleCtl) { shell.toggleCtl(); shell.toggleCtl = null; }
+      if (els.toggle.parentNode !== els.lead) els.lead.insertBefore(els.toggle, els.lead.firstChild);
+    } else if (!shell.toggleCtl) {
+      shell.toggleCtl = addTopControl(els.toggle, { before: 'undo' });
+    }
   }
 
   /* The share of the layout viewport an on-screen keyboard covers. iOS does
@@ -552,17 +567,27 @@ window.MindRoot = window.MindRoot || {};
     if (!els.stage || viewOnly()) return out;
     var stage = els.stage.getBoundingClientRect();
     var gap = 8;
-    [els.lead, els.actions].forEach(function (el) {
+    [els.lead, els.quick].forEach(function (el) {
       if (!el || el.offsetParent === null) return;
       var r = el.getBoundingClientRect();
       if (r.height) out.top = Math.max(out.top, Math.round(r.bottom - stage.top + gap));
     });
+    /* The dock lies along the foot of the map; the zoom capsule, upright,
+     * along its right edge. */
+    if (els.actions && els.actions.offsetParent !== null) {
+      var d = els.actions.getBoundingClientRect();
+      if (d.height) out.bottom = Math.max(out.bottom, Math.round(stage.bottom - d.top + gap));
+    }
+    if (els.zoombar && !els.zoombar.hidden && els.zoombar.getClientRects().length) {
+      var z = els.zoombar.getBoundingClientRect();
+      if (z.height > z.width) out.right = Math.max(out.right, Math.round(stage.right - z.left + gap));
+    }
     /* The format bar docked above the thumb bar (a phone writing a name)
      * covers the map as much as the thumb bar does: a node opened for
      * writing behind it would be typed into blind. */
     var bar = ns.editor ? ns.editor.formatBar : null;
     var docked = bar && !bar.hidden && bar.hasAttribute('data-docked') ? bar : null;
-    [els.thumbbar, els.zoombar, docked].forEach(function (el) {
+    [els.thumbbar, els.zoombar && els.zoombar.getBoundingClientRect().height <= els.zoombar.getBoundingClientRect().width ? els.zoombar : null, docked].forEach(function (el) {
       if (!el || el.hidden || !el.getClientRects().length) return;
       var r = el.getBoundingClientRect();
       if (r.height) out.bottom = Math.max(out.bottom, Math.round(stage.bottom - r.top + gap));

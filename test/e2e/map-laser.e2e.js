@@ -17,6 +17,7 @@ module.exports = async function (t) {
   var before = await E.history(page);
   var cam0 = await ev(function () { return JSON.stringify(window.MindRoot.session.view.camera()); });
   await page.click('#zoombar [data-command="view.laser"]');
+  await page.waitForFunction(function () { return document.querySelector('#zoombar [data-command="view.laser"]').getAttribute('aria-pressed') === 'true'; }, null, { timeout: 2000 }).catch(function () {});
   t.eq(await ev(function () { return window.MindRoot.laser.isOn() + ',' + document.querySelector('#zoombar [data-command="view.laser"]').getAttribute('aria-pressed'); }), 'true,true', 'on, the button pressed');
   await page.mouse.move(400, 300);
   for (var i = 1; i <= 10; i++) await page.mouse.move(400 + i * 25, 300 + i * 8);

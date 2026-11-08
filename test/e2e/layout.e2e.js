@@ -112,9 +112,10 @@ module.exports = async function (t) {
       var col = await page.evaluate(function () {
         var s = document.getElementById('sidebar').getBoundingClientRect();
         var m = document.getElementById('main').getBoundingClientRect();
-        return { sw: s.width, ml: m.left };
+        return { sw: s.width, sr: s.right, ml: m.left };
       });
-      t.check('a column beside the map', col.sw > 200 && Math.abs(col.ml - col.sw) < 2, col);
+      /* Layout v3: a floating panel inside its column, the map right after it. */
+      t.check('a column beside the map', col.sw > 200 && col.sr <= col.ml + 1 && col.ml - col.sr < 24, col);
       await page.click('#sidebar-toggle');
       await H.until(page, function () { return document.documentElement.getAttribute('data-sidebar') === 'closed'; });
       var closedCol = await page.evaluate(function () {

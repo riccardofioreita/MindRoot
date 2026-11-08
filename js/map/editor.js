@@ -3297,7 +3297,7 @@ window.MindRoot = window.MindRoot || {};
    * stage px: a docked bar keeps off all of it. */
   function chromeBoxes(box) {
     var out = [];
-    var els = document.querySelectorAll('#topbar .topbar__slot, #topbar .topbar__slot > *, #banners > *, #zoombar, #thumbbar');
+    var els = document.querySelectorAll('#topbar .topbar__slot, #topbar .topbar__slot > *, #dock > *, #banners > *, #zoombar, #thumbbar');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (el.hidden || !el.getClientRects().length) continue;
@@ -4710,7 +4710,7 @@ window.MindRoot = window.MindRoot || {};
     });
     /* The capsules themselves too, as chromeBoxes measures them: a slot can
      * keep its size while the capsule in it grows ("Saved at 17:01"). */
-    var els = document.querySelectorAll('#topbar .topbar__slot, #topbar .topbar__slot > *, #banners, #zoombar');
+    var els = document.querySelectorAll('#topbar .topbar__slot, #topbar .topbar__slot > *, #dock > *, #banners, #zoombar');
     for (var i = 0; i < els.length; i++) ro.observe(els[i]);
   }
 

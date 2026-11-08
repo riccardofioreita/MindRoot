@@ -28,6 +28,8 @@ Every map is a `.md` file you can also read and edit in Obsidian, VS Code or any
 
 ## The look
 
+**One dock, the map in the middle.** The map's name floats alone at the top centre; every action - projects, undo and redo, Markdown, the AI, the chat, search, Map | Board and More - lives in one glass dock at the foot of the map; zoom, fit, the laser and tidy stand upright at the right edge; the projects open as a floating glass panel. On a phone the dock is the thumb bar, with Markdown, AI chat and laser one tap away at the top right.
+
 MindRoot's interface is drawn in **liquid glass**: the bars, menus, panels and sheets are clear glass with a specular rim and a soft sheen, floating over a page lit by faint ambient light (`css/liquid.css`, tokens in `css/tokens.css`). The map itself - paper, ink, branch colours - is untouched, so what carries meaning reads exactly as before. Reduce transparency (Settings, or the system's), more contrast and forced colours give solid surfaces.
 
 ## Opening it

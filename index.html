@@ -246,9 +246,6 @@
           <span class="visually-hidden" id="save-status" role="status" aria-live="polite"></span>
         </div>
       </div>
-      <div class="topbar__slot topbar__slot--actions">
-        <div class="capsule glass" id="topbar-actions" role="toolbar" aria-label="Actions" data-i18n-aria-label="app.region.actions" data-liquid></div>
-      </div>
       <div class="topbar__slot topbar__slot--quick">
         <div class="capsule glass" id="topbar-quick" role="toolbar" aria-label="Markdown and AI" data-i18n-aria-label="app.region.quick"></div>
       </div>
@@ -258,6 +255,13 @@
 
     <div id="stage" role="region" aria-label="Map" data-i18n-aria-label="app.region.stage">
       <div id="floaters"></div>
+    </div>
+
+    <!-- The dock: one glass capsule at the foot of the map with every action
+         of the top bar (phones keep their thumb bar instead). A grid item in
+         the stage's cell, so it rises with the map when the Markdown docks. -->
+    <div class="topbar__slot topbar__slot--actions" id="dock">
+      <div class="capsule glass" id="topbar-actions" role="toolbar" aria-label="Actions" data-i18n-aria-label="app.region.actions" data-liquid></div>
     </div>
 
     <section id="source" aria-label="Markdown" data-i18n-aria-label="app.region.source" hidden></section>
