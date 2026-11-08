@@ -83,23 +83,26 @@
   box-shadow: inset 0 0 0 1px var(--glass-rim);
 }
 .btn--primary {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white) 0%, var(--accent) 100%);
+  background-color: var(--accent);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white) 0%, var(--accent) 100%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 1px 2px rgb(20 22 28 / 0.12), 0 4px 12px -2px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .btn--danger {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 88%, white) 0%, var(--danger) 100%);
+  background-color: var(--danger);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--danger) 88%, white) 0%, var(--danger) 100%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.24), 0 4px 12px -2px color-mix(in srgb, var(--danger) 40%, transparent);
 }
 /* Toggled on: a lit pill of accent glass. */
 .btn[aria-pressed="true"],
 .btn[aria-expanded="true"].btn--toggle {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 85%, white) 0%, var(--accent) 100%);
+  background-color: var(--accent);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 85%, white) 0%, var(--accent) 100%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.30), 0 2px 8px -2px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .btn--primary:disabled,
 .btn--primary[aria-disabled="true"],
 .btn--danger:disabled,
-.btn--danger[aria-disabled="true"] { background: var(--paper-sunken); box-shadow: none; }
+.btn--danger[aria-disabled="true"] { background-color: var(--paper-sunken); background-image: none; box-shadow: none; }
 /* Pressed: the surface gives a little under the finger (Emil Kowalski's
    0.97, never less: a button that shrinks more reads as broken). */
 .btn:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(0.97); }

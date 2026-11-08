@@ -1670,7 +1670,7 @@ window.MindRoot = window.MindRoot || {};
   }
 
   /* Every first-level branch: the children of the tree roots. */
-  function firstLevel() {
+  function firstLevelPaths() {
     var c = cur();
     if (!c) return [];
     var out = [];
@@ -4383,9 +4383,9 @@ window.MindRoot = window.MindRoot || {};
     C.register({
       id: 'map.splitBranches', label: 'editor.cmd.splitMap', group: 'map', icon: 'map',
       keywords: t('editor.kw.toMap'), help: 'editor.help.splitMap',
-      when: function () { return editable() && !!cur() && firstLevel().length > 0; },
+      when: function () { return editable() && !!cur() && firstLevelPaths().length > 0; },
       run: function () {
-        var list = firstLevel();
+        var list = firstLevelPaths();
         if (!list.length) { if (ns.ui && ns.ui.toast) ns.ui.toast(t('editor.splitNothing')); return false; }
         return toMaps(list);
       }
