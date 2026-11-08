@@ -1215,7 +1215,7 @@ window.MindRoot = window.MindRoot || {};
    * opts: title, label, body, actions [{label, kind, onClick}], onClose(reason),
    * detents (where a bottom sheet rests: 'content' and fractions of the
    * visible height, e.g. ['content', 0.92] or [0.5, 0.92]; default ['content'],
-   * the content's own height up to 92%), modal (default true), place
+   * the content's own height up to 92%; it opens at the highest of them), modal (default true), place
    * ('auto' | 'bottom' | 'center' | 'side'), desktop ('center' | 'side',
    * where 'auto' goes on wide screens), cls, initialFocus.
    * Returns {el, body, head, close(reason), setTitle(text), isOpen(), detent()}. */
@@ -1644,7 +1644,10 @@ window.MindRoot = window.MindRoot || {};
     if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
 
     measure();
-    setRest(0);
+    /* It opens at its highest rest: everything it holds in view at once,
+     * nothing to drag up first; a pull on the pill lowers it or puts it
+     * away. */
+    setRest(rests.length - 1);
 
     return {
       index: function () { return index; },

@@ -182,8 +182,8 @@ module.exports = async function (t) {
   t.check('the preview map draws on a phone too', true);
   await W.rest(phone);
   await t.shot('phone-preview', phone);
-  /* The sheet rests at 60% of the screen: the action the preview is for
-   * is on screen there, not below it. */
+  /* The sheet opens at its highest rest: the action the preview is for is
+   * on screen there, not below it. */
   var reach = await phone.evaluate(function () {
     var s = document.querySelector('dialog.sheet[open]');
     var go = document.getElementById('copies-go');
@@ -192,7 +192,7 @@ module.exports = async function (t) {
     var hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return { detent: s.getAttribute('data-detent'), inside: r.top >= s.getBoundingClientRect().top && r.bottom <= window.innerHeight + 0.5, hit: !!(hit && hit.closest('#copies-go')), map: Math.round(m.height), mapBelowGo: m.bottom <= r.top + 0.5 };
   });
-  t.eq(reach.detent, 'low', 'the sheet at its low rest');
+  t.eq(reach.detent, 'top', 'the sheet at its highest rest');
   t.check('"Go back to it" is on screen', reach.inside && reach.hit, JSON.stringify(reach));
   t.check('the map fills what is left above it', reach.map >= 150 && reach.mapBelowGo, JSON.stringify(reach));
   await phone.tap('#copies-go');

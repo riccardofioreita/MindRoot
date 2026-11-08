@@ -95,6 +95,7 @@ What is sent is said in the AI window: by default only the words of the node and
 Bottom sheets and a thumb bar instead of a squeezed desktop:
 
 - a tap selects a node, a double tap renames it, a long press opens its menu (keep moving the finger to drag the node);
+- windows such as the AI assistant, settings or help open as sheets from the bottom already at full height; pull the pill down to lower or close them;
 - one finger pans, two fingers zoom; a swipe from the left edge brings out the projects;
 - the bottom bar holds child, sibling, rename and undo, and "More" for the rest; a small capsule at the top right opens the Markdown, the AI chat and the laser in one tap;
 - in a notebook a finger draws until a stylus has been used, and pans from then on.

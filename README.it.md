@@ -94,6 +94,7 @@ Cosa si invia lo dice la finestra AI: di serie solo le parole del nodo e dei nod
 
 Pannelli dal basso e una barra per il pollice, invece di un desktop rimpicciolito:
 
+- finestre come l'assistente AI, le impostazioni o la guida si aprono come fogli dal basso già a tutta altezza; trascina la linguetta in giù per abbassarle o chiuderle;
 - un tocco seleziona un nodo, un doppio tocco lo rinomina, una pressione lunga apre il suo menu (continua a muovere il dito per trascinarlo);
 - un dito sposta la mappa, due dita fanno zoom; un trascinamento dal bordo sinistro mostra i progetti;
 - la barra in basso ha figlio, fratello, rinomina e annulla, e «Altro» per il resto; una piccola capsula in alto a destra apre con un tocco il Markdown, la chat AI e il laser;

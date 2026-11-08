@@ -616,6 +616,15 @@ module.exports = async function (t) {
     window.__detent = window.MindRoot.ui.sheet({ title: 'Long', body: body, detents: [0.5, 0.92], actions: [{ label: 'Empty the trash', kind: 'danger' }] });
   });
   await H.until(phone, sheetSettled, null, 3000);
+  /* It opens at its highest rest, nothing to drag up first; a pull on the
+   * pill brings it down to the low one. */
+  t.eq(await phone.evaluate(function () { return window.__detent.detent(); }), 1, 'it opens at the highest rest');
+  var gripFirst = await phone.evaluate(function () {
+    var r = document.querySelector('dialog.sheet[open] .sheet__grip').getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  });
+  await finger(cdp, gripFirst, { x: gripFirst.x, y: gripFirst.y + 330 }, 22, 16);
+  await H.until(phone, sheetSettled, null, 3000);
   var low = await phone.evaluate(function () {
     var d = document.querySelector('dialog.sheet[open]');
     var body = d.querySelector('.sheet__body');
@@ -788,7 +797,8 @@ module.exports = async function (t) {
     var r = d.getBoundingClientRect();
     return { top: Math.round(r.top), bottom: Math.round(r.bottom), foot: Math.round(d.querySelector('.sheet__foot').getBoundingClientRect().bottom), visibleBottom: window.innerHeight - 336 };
   });
-  t.check('a sheet rests on the keyboard, half of what is visible, its actions in sight', kbSheet.bottom === kbSheet.visibleBottom && Math.abs((kbSheet.bottom - kbSheet.top) - 254) < 12 && kbSheet.foot <= kbSheet.visibleBottom, kbSheet);
+  /* It opens at its highest rest: 92% of what the keyboard leaves visible. */
+  t.check('a sheet rests on the keyboard, at its highest rest, its actions in sight', kbSheet.bottom === kbSheet.visibleBottom && Math.abs((kbSheet.bottom - kbSheet.top) - Math.round(kbSheet.visibleBottom * 0.92)) < 12 && kbSheet.foot <= kbSheet.visibleBottom, kbSheet);
   await kb.evaluate(function () { window.__kbSheet.close(); });
   await kb.evaluate(function () { window.__kb = 0; window.__vv.dispatchEvent(new Event('resize')); });
   await H.until(kb, function () { return getComputedStyle(document.documentElement).getPropertyValue('--kb').trim() === '0px'; });
