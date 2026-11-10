@@ -84,6 +84,8 @@ Off, and with no network, until you open the sparkles in the top bar (Ctrl+Shift
 
 **With another AI**: "Copy the guide for another AI" in the AI window gives any chat assistant the format of a MindRoot project; it writes a JSON file, which MindRoot imports as it is.
 
+**With an AI coding agent**: the `mindroot` skill (`.claude/skills/mindroot/`) teaches an agent such as Claude Code to turn the codebase it is working in, a folder or a single file into maps. Called on a project or a file (`/mindroot src/auth/`), it asks whether you want a single map or a whole project of linked maps, writes the `.md` files or the `.interneuron` folder, and checks them with MindRoot's own parser before it answers; you drop the result on MindRoot. An agent working in this repository finds the skill as it is; `node tools/skill.js` installs it for all your projects (`~/.claude/skills/mindroot`), `node tools/skill.js <dir>` somewhere else. It needs no key in MindRoot: the agent is the AI.
+
 What is sent is said in the AI window: by default only the words of the node and the nodes round it; the chat sends what you write in it, and the open map, the project or other projects only if you allow it. The key is kept in this tab, in this browser or encrypted by a passphrase, never in a map or a backup. **Using the AI spends tokens on your own account with the provider, and the cost may be high: check it with your provider.**
 
 ![The AI assistant window](docs/screens/ai-window.png)
@@ -171,6 +173,7 @@ No runtime dependency and no build: classic scripts (`window.MindRoot`), no ES m
 - `node test/run.js` runs every suite in headless Chromium (Playwright: `npm i -g playwright`); `node test/run.js <suite> ...` runs some, `--list` lists them. Any network request, page error or console error fails a suite.
 - `node tools/static-audit.js` checks that the page uses no modules, no `fetch`, no sockets and no remote resources; `node tools/english-audit.js` that the project is written in English outside the Italian dictionaries.
 - `node tools/single.js` builds `dist/MindRoot.html`; `node tools/pages.js <dir>` writes the folder of the online version (deployed to GitHub Pages by `.github/workflows/pages.yml`).
+- `node tools/skill.js [dir]` installs the `mindroot` skill for an AI coding agent (the skill, its validator and a copy of the parser); `node .claude/skills/mindroot/validate.js <folder or map.md>` checks maps written outside the app.
 - `node tools/screens.js` takes the screenshots of this README from the real app (dark theme, the AI played by a stand-in).
 
 ## Credits and licences

@@ -103,9 +103,12 @@ tools/                     static-audit.js: no modules, no local fetch, no remot
                            single.js: dist/MindRoot.html, everything inlined, no pwa.js (no manifest, no worker)
                            make-icons.js (shell): the PNG icons from the SVG logo
                            pages.js: the folder GitHub Pages publishes (app files only, checked against index.html and sw.js)
+                           skill.js: installs the mindroot skill somewhere else (SKILL.md, validate.js and a copy of js/model/doc.js)
 dist/                      build output of tools/single.js (gitignored)
 README.md, README.it.md    the README in English, and its Italian translation (kept in sync)
 docs/                      ARCHITECTURE.md (this file), FORMAT.md (the data formats), NOTEBOOK.md (the notebooks)
+.claude/skills/mindroot/   the skill an AI coding agent uses to write maps: SKILL.md (what to ask and how to write) and
+                           validate.js (reads what was written with js/model/doc.js); test/e2e/skill.e2e.js holds both to the parser
 .github/workflows/pages.yml  deploys the folder tools/pages.js writes to GitHub Pages on every push to main
 ```
 
